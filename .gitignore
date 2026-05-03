@@ -9,6 +9,7 @@ cfg.docker.php
 private/
 storage/
 api/vendor/
+api/vendor.prod/
 api/.phpunit.cache/
 web/node_modules/
 web/dist/
