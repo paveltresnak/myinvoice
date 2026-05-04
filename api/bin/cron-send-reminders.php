@@ -67,8 +67,11 @@ $sql = "SELECT i.id, i.varsymbol, i.invoice_type, i.due_date, i.amount_to_pay, c
           FROM invoices i
           JOIN clients c ON c.id = i.client_id
           JOIN currencies cur ON cur.id = i.currency_id
+          JOIN supplier s ON s.id = i.supplier_id
          WHERE i.status IN ('issued','sent','reminded')
            AND i.invoice_type IN ('invoice','proforma')
+           AND s.auto_send_reminders = 1
+           AND c.auto_send_reminders = 1
            AND i.due_date < (CURDATE() - INTERVAL ? DAY)
            AND (i.last_reminder_at IS NULL OR i.last_reminder_at < (NOW() - INTERVAL ? DAY))
          ORDER BY i.due_date ASC, i.id ASC";

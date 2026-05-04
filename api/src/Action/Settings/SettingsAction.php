@@ -175,7 +175,7 @@ final class SettingsAction
             'company_name', 'display_name', 'street', 'city', 'zip', 'country_id',
             'ic', 'dic', 'is_vat_payer', 'email', 'phone', 'web', 'tagline', 'commercial_register',
             'default_currency_id', 'default_vat_rate_id', 'default_payment_due_days',
-            'default_hourly_rate', 'logo_path', 'signature_path',
+            'default_hourly_rate', 'auto_send_reminders', 'logo_path', 'signature_path',
             'pohoda_account_code', 'pohoda_centre_code', 'pohoda_activity_code', 'pohoda_contract_code',
         ];
         // Legacy: pokud frontend pošle 'default_currency' jako code, převedeme na id (scoped to supplier)
@@ -191,7 +191,9 @@ final class SettingsAction
         foreach ($allowed as $f) {
             if (array_key_exists($f, $body)) {
                 $sets[] = "$f = ?";
-                $params[] = $f === 'is_vat_payer' ? ((int) (bool) $body[$f]) : $body[$f];
+                $params[] = in_array($f, ['is_vat_payer', 'auto_send_reminders'], true)
+                    ? ((int) (bool) $body[$f])
+                    : $body[$f];
             }
         }
         if (empty($sets)) return $this->respondSupplier($response, $id);
@@ -275,6 +277,7 @@ final class SettingsAction
         $row['default_currency_id']      = (int) $row['default_currency_id'];
         $row['default_payment_due_days'] = (int) $row['default_payment_due_days'];
         $row['default_hourly_rate']      = (float) $row['default_hourly_rate'];
+        $row['auto_send_reminders']      = (bool) $row['auto_send_reminders'];
         return Json::ok($response, $row);
     }
 

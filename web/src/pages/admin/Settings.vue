@@ -49,6 +49,7 @@ async function saveSupplier() {
       commercial_register: supplier.value.commercial_register,
       default_payment_due_days: supplier.value.default_payment_due_days,
       default_hourly_rate: supplier.value.default_hourly_rate,
+      auto_send_reminders: supplier.value.auto_send_reminders,
       pohoda_account_code: supplier.value.pohoda_account_code,
       pohoda_centre_code: supplier.value.pohoda_centre_code,
       pohoda_activity_code: supplier.value.pohoda_activity_code,
@@ -191,6 +192,13 @@ async function removeCurrency(c: CurrencyAccount) {
           <div>
             <label class="block text-sm font-medium text-neutral-700 mb-1">{{ t('settings.default_hourly_rate') }} ({{ supplier.default_currency }})</label>
             <input v-model.number="supplier.default_hourly_rate" type="number" step="0.01" min="0" class="w-full h-10 px-3 border border-neutral-300 rounded-md text-sm font-mono" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="flex items-center gap-2 text-sm">
+              <input v-model="supplier.auto_send_reminders" type="checkbox" class="rounded border-neutral-300 text-primary-600" />
+              {{ t('settings.auto_send_reminders') }}
+            </label>
+            <p class="text-xs text-neutral-500 mt-1 ml-6">{{ t('settings.auto_send_reminders_hint') }}</p>
           </div>
         </div>
 

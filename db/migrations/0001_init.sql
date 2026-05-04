@@ -144,6 +144,7 @@ CREATE TABLE supplier (
   default_vat_rate_id      INT UNSIGNED NOT NULL,
   default_payment_due_days INT UNSIGNED NOT NULL DEFAULT 7,
   default_hourly_rate      DECIMAL(10,2) NOT NULL DEFAULT 1500.00,
+  auto_send_reminders      TINYINT(1) NOT NULL DEFAULT 1,         -- cron-send-reminders přeskočí supplier=0; ruční pořád jdou
   logo_path                VARCHAR(255) NULL,
   signature_path           VARCHAR(255) NULL,
   -- Pohoda XML export — kódy pro číselníky (NULL = nepoužívat)
@@ -180,6 +181,7 @@ CREATE TABLE clients (
   currency_default_id  INT UNSIGNED NOT NULL,
   vat_rate_default_id  INT UNSIGNED NULL,
   reverse_charge       TINYINT(1) NOT NULL DEFAULT 0,
+  auto_send_reminders  TINYINT(1) NOT NULL DEFAULT 1,             -- cron-send-reminders přeskočí klienta=0; ruční pořád jdou
   payment_due_default  INT UNSIGNED NULL,
   note                 TEXT NULL,
   archived_at          TIMESTAMP NULL,

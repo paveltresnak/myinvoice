@@ -17,6 +17,7 @@ export interface Client {
   currency_default_id: number
   currency_default: string
   reverse_charge: boolean
+  auto_send_reminders: boolean
   payment_due_default?: number | null
   note?: string | null
   archived_at?: string | null
@@ -90,6 +91,7 @@ export interface ClientPayload {
   language: 'cs' | 'en'
   currency_default_id: number
   reverse_charge: boolean
+  auto_send_reminders: boolean
   payment_due_default?: number | null
   note?: string | null
 }

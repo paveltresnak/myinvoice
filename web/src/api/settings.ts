@@ -24,6 +24,7 @@ export interface Supplier {
   default_vat_rate_id: number
   default_payment_due_days: number
   default_hourly_rate: number
+  auto_send_reminders: boolean
   logo_path: string | null
   signature_path: string | null
   pohoda_account_code: string | null

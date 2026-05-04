@@ -107,8 +107,9 @@ final class ClientRepository
 
         $sql = 'INSERT INTO clients
             (supplier_id, company_name, first_name, last_name, ic, dic, street, city, zip, country_id,
-             main_email, phone, language, currency_default_id, reverse_charge, payment_due_default, note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+             main_email, phone, language, currency_default_id, reverse_charge, auto_send_reminders,
+             payment_due_default, note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
         $stmt = $this->db->pdo()->prepare($sql);
         $stmt->execute([
             $supplierId,
@@ -126,6 +127,7 @@ final class ClientRepository
             (string) ($data['language'] ?? 'cs'),
             $currencyId,
             !empty($data['reverse_charge']) ? 1 : 0,
+            array_key_exists('auto_send_reminders', $data) ? ((int) (bool) $data['auto_send_reminders']) : 1,
             isset($data['payment_due_default']) ? (int) $data['payment_due_default'] : null,
             $this->nullable($data, 'note'),
         ]);
@@ -145,7 +147,7 @@ final class ClientRepository
                 company_name = ?, first_name = ?, last_name = ?, ic = ?, dic = ?,
                 street = ?, city = ?, zip = ?, country_id = ?,
                 main_email = ?, phone = ?, language = ?, currency_default_id = ?,
-                reverse_charge = ?, payment_due_default = ?, note = ?
+                reverse_charge = ?, auto_send_reminders = ?, payment_due_default = ?, note = ?
                 WHERE id = ?';
         $stmt = $this->db->pdo()->prepare($sql);
         $stmt->execute([
@@ -163,6 +165,7 @@ final class ClientRepository
             (string) ($data['language'] ?? 'cs'),
             $currencyId,
             !empty($data['reverse_charge']) ? 1 : 0,
+            array_key_exists('auto_send_reminders', $data) ? ((int) (bool) $data['auto_send_reminders']) : 1,
             isset($data['payment_due_default']) ? (int) $data['payment_due_default'] : null,
             $this->nullable($data, 'note'),
             $id,
@@ -241,6 +244,9 @@ final class ClientRepository
         if (isset($row['supplier_id'])) $row['supplier_id'] = (int) $row['supplier_id'];
         if (isset($row['currency_default_id'])) $row['currency_default_id'] = (int) $row['currency_default_id'];
         $row['reverse_charge']        = (bool) ($row['reverse_charge'] ?? 0);
+        if (array_key_exists('auto_send_reminders', $row)) {
+            $row['auto_send_reminders'] = (bool) $row['auto_send_reminders'];
+        }
         if (array_key_exists('active_projects_count', $row)) {
             $row['active_projects_count'] = (int) $row['active_projects_count'];
         }

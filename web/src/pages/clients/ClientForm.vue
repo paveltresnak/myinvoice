@@ -26,6 +26,7 @@ const form = ref<ClientPayload>({
   language: 'cs',
   currency_default_id: 0,
   reverse_charge: false,
+  auto_send_reminders: true,
   payment_due_default: 7,
   note: null,
 })
@@ -69,6 +70,7 @@ function sanitize(c: Client): Partial<ClientPayload> {
     language: c.language,
     currency_default_id: c.currency_default_id,
     reverse_charge: c.reverse_charge,
+    auto_send_reminders: c.auto_send_reminders ?? true,
     payment_due_default: c.payment_due_default ?? null,
     note: c.note ?? null,
   }
@@ -266,6 +268,14 @@ async function submit() {
               <span>{{ t('client.reverse_charge') }}</span>
             </label>
           </div>
+        </div>
+
+        <div>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="form.auto_send_reminders" type="checkbox" class="rounded border-neutral-300 text-primary-600" />
+            <span>{{ t('client.auto_send_reminders') }}</span>
+          </label>
+          <p class="text-xs text-neutral-500 mt-1 ml-6">{{ t('client.auto_send_reminders_hint') }}</p>
         </div>
 
         <div>
