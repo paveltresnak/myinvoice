@@ -109,14 +109,17 @@ async function checkVies() {
   try {
     const result = await clientsApi.lookupVies(form.value.dic)
     viesResult.value = result
-    // Pokud ARES nevrátil adresu (zahraniční klient), vyplníme z VIES parsed
-    if (result.valid && result.parsed && !form.value.street) {
-      form.value.street = result.parsed.street
-      form.value.city = result.parsed.city
-      form.value.zip = result.parsed.zip
-      if (result.country) form.value.country_iso2 = result.country
+    if (result.valid) {
       if (result.name && !form.value.company_name) {
         form.value.company_name = result.name
+      }
+      if (result.country && !form.value.street) {
+        form.value.country_iso2 = result.country
+      }
+      if (result.parsed && !form.value.street) {
+        form.value.street = result.parsed.street
+        form.value.city = result.parsed.city
+        form.value.zip = result.parsed.zip
       }
     }
   } catch (e: any) {

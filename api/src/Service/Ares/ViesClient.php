@@ -227,15 +227,30 @@ final class ViesClient
      */
     private function parseCzSk(array $lines): ?array
     {
-        // Poslední řádek by měl být "PSČ město"
+        // Drop trailing country name lines (VIES SK: "Slovensko", VIES CZ: "Česko" / "Česká republika")
+        $countryNames = ['slovensko', 'slovenská republika', 'slovenska republika', 'česko', 'cesko', 'česká republika', 'ceska republika', 'czech republic', 'czechia'];
+        while (!empty($lines)) {
+            $tail = mb_strtolower(end($lines), 'UTF-8');
+            if (in_array($tail, $countryNames, true)) {
+                array_pop($lines);
+            } else {
+                break;
+            }
+        }
+        if (empty($lines)) return null;
+
+        // Poslední řádek = "PSČ město" — CZ má "301 00 Plzeň", SK má "82108 Bratislava"
         $last = end($lines);
         if (!preg_match('/^(\d{3}\s?\d{2})\s+(.+)$/u', $last, $m)) {
             return null;
         }
         $zip  = preg_replace('/\s+/', ' ', $m[1]);
-        $city = $this->prettyCase(trim($m[2]));
+        $city = trim($m[2]);
 
-        // Pokud má město suffix " 1" / " 3" (Praha 1, Plzeň 3) zachovej
+        // Strip suffixy typu "Bratislava - mestská časť Ružinov" → "Bratislava"
+        $city = preg_replace('/\s*-\s*(mestská|mestska)\s+(časť|cast)\b.*$/iu', '', $city);
+        $city = $this->prettyCase(trim($city));
+
         // První řádek = ulice
         $street = $lines[0] ?? '';
 
@@ -295,7 +310,23 @@ final class ViesClient
         $row = $stmt->fetchColumn();
         if ($row === false) return null;
         $data = json_decode((string) $row, true);
-        return is_array($data) ? $data : null;
+        if (!is_array($data)) return null;
+
+        // Repair: starší cache může mít parsed:null kvůli předchozí slabší heuristice.
+        // Když je payload validní a máme address+country, zkusíme re-parse novou logikou.
+        if (
+            ($data['valid'] ?? false) === true
+            && ($data['parsed'] ?? null) === null
+            && !empty($data['address'])
+            && !empty($data['country'])
+        ) {
+            $reparsed = $this->parseAddress((string) $data['address'], (string) $data['country']);
+            if ($reparsed !== null) {
+                $data['parsed'] = $reparsed;
+                $this->cache($vatId, $data);
+            }
+        }
+        return $data;
     }
 
     private function cache(string $vatId, array $payload): void

@@ -36,6 +36,13 @@ const projects = ref<Project[]>([])
 const vatRates = ref<VatRate[]>([])
 const currencies = ref<Currency[]>([])
 
+// RC zobrazit jen když klient není vybraný NEBO má RC povolenou v profilu.
+const showReverseChargeUI = computed(() => {
+  if (!form.value.client_id) return true
+  const c = clients.value.find(c => c.id === form.value.client_id)
+  return !!c?.reverse_charge
+})
+
 const form = ref<{
   invoice_type: 'invoice' | 'proforma' | 'credit_note'
   client_id: number | null
@@ -80,9 +87,21 @@ function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-function defaultVatRateId(): number {
+function defaultVatRateId(reverseCharge = false): number {
+  if (reverseCharge) {
+    const rc = vatRates.value.find(v => v.is_reverse_charge)
+    if (rc) return rc.id
+  }
   const def = vatRates.value.find(v => v.is_default)
   return def?.id ?? vatRates.value[0]?.id ?? 0
+}
+
+// Když se přepne RC (z klienta nebo ručním checkboxem), sjednoť vat_rate_id všech položek
+// s novým defaultem — display by jinak ukazoval 21 % zatímco totals už počítají 0 % RC.
+function syncItemsVatRateToReverseCharge() {
+  const target = defaultVatRateId(form.value.reverse_charge)
+  if (!target) return
+  for (const it of form.value.items) it.vat_rate_id = target
 }
 
 function vatRateLabel(r: VatRate): string {
@@ -105,10 +124,16 @@ function blankItem(): InvoiceItem {
     quantity: qty,
     unit: 'h',
     unit_price_without_vat: rate,
-    vat_rate_id: defaultVatRateId(),
+    vat_rate_id: defaultVatRateId(form.value.reverse_charge),
     order_index: form.value.items.length,
   }
 }
+
+// Ruční toggle RC checkboxu → resync vat_rate_id u položek s aktuálním defaultem.
+// Loaded guard chrání edit-mode init před přepsáním uložených sazeb.
+watch(() => form.value.reverse_charge, (newVal, oldVal) => {
+  if (loaded.value && newVal !== oldVal) syncItemsVatRateToReverseCharge()
+})
 
 // Při přepnutí typu na credit_note převrať množství všech existujících položek na záporná.
 watch(() => form.value.invoice_type, (newType, oldType) => {
@@ -220,7 +245,9 @@ async function applyClientDefaults(clientId: number) {
   form.value.currency_id = c.currency_default_id
   form.value.currency = c.currency_default
   form.value.language = c.language
+  const rcChanged = form.value.reverse_charge !== c.reverse_charge
   form.value.reverse_charge = c.reverse_charge
+  if (rcChanged) syncItemsVatRateToReverseCharge()
   if (c.payment_due_default) {
     form.value.due_date = addDays(form.value.issue_date, c.payment_due_default)
   }
@@ -405,7 +432,7 @@ function pushWrToInvoiceItem() {
   const totalHours = wrTotalHours.value
   const totalAmount = wrTotalAmount.value
   const avgRate = totalHours > 0 ? Math.round((totalAmount / totalHours) * 100) / 100 : 0
-  const defaultVatId = vatRates.value.find(v => v.is_default)?.id ?? vatRates.value[0]?.id ?? 1
+  const defaultVatId = defaultVatRateId(form.value.reverse_charge)
   const description = wrTitle.value || t('invoice.work_report')
 
   // 1. Položka se shodným popisem → sync (aktualizace hodin/sazby).
@@ -701,7 +728,7 @@ async function deleteDraft() {
                 </select>
               </div>
             </div>
-            <label class="flex items-center gap-2 text-sm text-neutral-700">
+            <label v-if="showReverseChargeUI" class="flex items-center gap-2 text-sm text-neutral-700">
               <input v-model="form.reverse_charge" type="checkbox" class="rounded border-neutral-300 text-primary-600" />
               <span>{{ t('invoice.reverse_charge') }} ({{ t('invoice.totals.vat') }} 0 %)</span>
             </label>
