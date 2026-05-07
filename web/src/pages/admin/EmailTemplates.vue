@@ -115,7 +115,7 @@ function codeLabel(code: string): string {
     </div>
 
     <!-- Editor modal -->
-    <div v-if="editing" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="editing = null">
+    <div v-if="editing" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto p-5">
         <h3 class="text-lg font-semibold mb-3">{{ codeLabel(editing.code) }} <span class="text-xs font-mono uppercase text-neutral-500 ml-1">{{ editing.locale }}</span></h3>
 

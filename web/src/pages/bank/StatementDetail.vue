@@ -228,7 +228,7 @@ async function unmatchTx(tx: BankTransaction) {
     </div>
 
     <!-- Manual match modal — párování přes variabilní symbol faktury -->
-    <div v-if="matchingTx" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="matchingTx = null">
+    <div v-if="matchingTx" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ t('bank.manual_match_title') }}</h3>
         <label class="block text-sm font-medium text-neutral-700 mb-1">{{ t('bank.invoice_vs') }}</label>

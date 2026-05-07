@@ -701,7 +701,7 @@ async function updateApprovalStatus() {
     </div>
 
     <!-- Mark paid modal -->
-    <div v-if="markPaidOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="markPaidOpen = false">
+    <div v-if="markPaidOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-sm w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ t('invoice.modals.mark_paid_title') }}</h3>
         <label class="block text-sm font-medium text-neutral-700 mb-1">{{ t('invoice.modals.mark_paid_date') }}</label>
@@ -717,7 +717,7 @@ async function updateApprovalStatus() {
     </div>
 
     <!-- Cancel modal -->
-    <div v-if="cancelOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="cancelOpen = false">
+    <div v-if="cancelOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ t('invoice.modals.cancel_title') }}</h3>
         <p class="text-sm text-neutral-600 mb-3">{{ t('invoice.modals.cancel_choose') }}</p>
@@ -769,7 +769,7 @@ async function updateApprovalStatus() {
     </div>
 
     <!-- Send modal -->
-    <div v-if="sendOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="sendOpen = false">
+    <div v-if="sendOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ t('invoice.modals.send_title') }}</h3>
         <label class="block text-sm font-medium text-neutral-700 mb-1">{{ t('invoice.modals.send_recipients') }}</label>
@@ -786,7 +786,7 @@ async function updateApprovalStatus() {
     </div>
 
     <!-- Reminder modal -->
-    <div v-if="reminderOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="reminderOpen = false">
+    <div v-if="reminderOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-1">{{ t('invoice.modals.reminder_title') }}</h3>
         <p class="text-sm text-warning-600 font-medium mb-3">{{ t('invoice.modals.reminder_overdue', { days: daysOverdue }) }}</p>
@@ -1129,7 +1129,7 @@ async function updateApprovalStatus() {
     </div>
 
     <!-- Approval status modal (admin) -->
-    <div v-if="approvalStatusOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="approvalStatusOpen = false">
+    <div v-if="approvalStatusOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ t('invoice.approval.modal_title') }}</h3>
         <p class="text-sm text-neutral-600 mb-3">{{ t('invoice.approval.modal_hint') }}</p>

@@ -179,7 +179,7 @@ function switchTo(id: number) {
     </div>
 
     <!-- Create modal -->
-    <div v-if="createOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="createOpen = false">
+    <div v-if="createOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-xl w-full p-5">
         <h3 class="text-lg font-semibold mb-1">{{ t('supplier.create_title') }}</h3>
         <p class="text-xs text-neutral-500 mb-4">{{ t('supplier.create_hint') }}</p>

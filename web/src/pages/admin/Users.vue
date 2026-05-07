@@ -206,7 +206,7 @@ function roleBadge(role: string): string {
     </div>
 
     <!-- Modal -->
-    <div v-if="showForm" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="showForm = false">
+    <div v-if="showForm" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ form.id === null ? t('users.new_title') : t('users.edit_title', { email: form.email }) }}</h3>
         <div class="space-y-3">

@@ -536,7 +536,7 @@ async function deleteCountry(c: Country) {
     </section>
 
     <!-- ====== Modals ====== -->
-    <div v-if="currencyOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="currencyOpen = false">
+    <div v-if="currencyOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ currencyDraft._new ? t('codebooks.new_currency') : t('settings.edit_currency', { code: currencyDraft.code }) }}</h3>
         <div class="space-y-3">
@@ -585,7 +585,7 @@ async function deleteCountry(c: Country) {
       </div>
     </div>
 
-    <div v-if="vatOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="vatOpen = false">
+    <div v-if="vatOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ vatDraft._new ? t('codebooks.new_vat') : vatDraft.code }}</h3>
         <div class="space-y-3">
@@ -623,7 +623,7 @@ async function deleteCountry(c: Country) {
       </div>
     </div>
 
-    <div v-if="unitOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="unitOpen = false">
+    <div v-if="unitOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ unitDraft._new ? t('codebooks.new_unit') : unitDraft.code }}</h3>
         <div class="space-y-3">
@@ -654,7 +654,7 @@ async function deleteCountry(c: Country) {
       </div>
     </div>
 
-    <div v-if="countryOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4" @click.self="countryOpen = false">
+    <div v-if="countryOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
         <h3 class="text-lg font-semibold mb-3">{{ countryDraft._new ? t('codebooks.new_country') : countryDraft.iso2 }}</h3>
         <div class="space-y-3">
