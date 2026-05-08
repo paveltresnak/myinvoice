@@ -73,7 +73,7 @@ takže aktualizace je otázkou jednoho příkazu.
 > 🔔 **Upgrade přímo z UI:** od **v3.0.0** vidí admin v **Systém →
 > Aktualizace** stav verze + tlačítko *Aktualizovat*, které pull image
 > + restart spustí přes host-side watcher. Detaily včetně instalace
-> watcheru jako systemd unit / Scheduled Task → § 19 Aktualizace.
+> watcheru jako systemd unit / Scheduled Task → § 2.1.9 nebo § 19.4.
 > Pro denní kontrolu nové verze nezapomeň naplánovat
 > `php api/bin/cron-version-check.php` (1× denně, viz § 19.2).
 
@@ -288,6 +288,84 @@ této změně zkusil load přes `http://`, login se rozbije (cookie se neuloží
 
 Restart stacku: `docker compose -f docker-compose.production.yml restart app`
 (nebo bez `-f` flagu pro Variantu B).
+
+### 2.1.9 Update watcher — jednoclick upgrade z UI (volitelné)
+
+Od **v3.0.0** vidí admin v **Systém → Aktualizace** stav verze + tlačítko
+*Aktualizovat*, které zařadí upgrade do fronty. Aby ho někdo aplikoval,
+musí na hostu běžet **watcher** — proces, který přes `docker compose
+exec` poslouchá flag soubor uvnitř kontejneru a spouští
+`cmd/docker-update.(sh/ps1)`. Bez watcheru tlačítko *Aktualizovat*
+nikam nedojede (UI zůstane věčně ve stavu „Upgrade probíhá…") a musíš
+upgrade aplikovat ručně přes shell.
+
+#### Test režim (foreground)
+
+Než ho udělej daemon, otestuj ho v běžícím okně:
+
+```bash
+# Linux / macOS
+cd /opt/myinvoice
+bash cmd/docker-update-watcher.sh
+```
+
+```powershell
+# Windows PowerShell
+cd C:\inetpub\myinvoice
+powershell -NoProfile -ExecutionPolicy Bypass -File cmd\docker-update-watcher.ps1
+```
+
+Vidíš `[watcher] start, polling storage/upgrade-requested.json inside
+container every 30s` — od té chvíle hlídá flag. Klikni v UI
+**„Aktualizovat"** a do 30 s zachytí flag, spustí
+`cmd/docker-update.(sh/ps1)`, výsledek napíše zpátky. Watcher zastav
+`Ctrl+C`.
+
+#### Linux — systemd unit (produkce)
+
+```bash
+sudo tee /etc/systemd/system/myinvoice-update-watcher.service <<'EOF'
+[Unit]
+Description=MyInvoice update watcher
+After=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/myinvoice
+ExecStart=/opt/myinvoice/cmd/docker-update-watcher.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now myinvoice-update-watcher
+```
+
+Logy: `journalctl -u myinvoice-update-watcher -f`.
+
+#### Windows — Scheduled Task (produkce)
+
+```powershell
+schtasks /create /tn "MyInvoice Update Watcher" `
+  /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\inetpub\myinvoice\cmd\docker-update-watcher.ps1" `
+  /sc onstart /ru SYSTEM /rl HIGHEST
+schtasks /run /tn "MyInvoice Update Watcher"
+```
+
+Stav úlohy: `schtasks /query /tn "MyInvoice Update Watcher" /v /fo list`.
+
+#### Daily check pro detekci nové verze
+
+Watcher jen reaguje na *kliknutí*. Aby admin **viděl**, že je dostupná
+nová verze (badge v patičce + status na `/admin/update`), musí běžet
+denní cron `cmd/cron-version-check.(sh/cmd)` — viz § 19.2.
+
+#### Plné detaily
+
+Recovery při zaseknutém upgradu, test workflow z `master`, externí
+monitoring přes `/api/version` → § 19 Aktualizace.
 
 ## 2.2 Nativní install (5 minut)
 
