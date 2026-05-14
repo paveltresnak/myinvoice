@@ -7,6 +7,7 @@ import { invoicesApi, type InvoiceListItem } from '@/api/invoices'
 import { recurringApi, type RecurringTemplate } from '@/api/recurring'
 import { formatMoney, formatDate, statusLabel, typeLabel, statusBadgeClass, isOverdue, invoiceRowClass } from '@/composables/useFormat'
 import MonthlyRevenueChart from '@/components/charts/MonthlyRevenueChart.vue'
+import TopProjectsBarChart from '@/components/charts/TopProjectsBarChart.vue'
 import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
@@ -39,6 +40,18 @@ const monthlyChart = computed(() => {
     labels: data.map(r => r.month),
     values: data.map(r => r.total),
   }
+})
+
+const projectsChart = computed(() => {
+  const data = (client.value?.revenue_by_project ?? []).filter(r => r.currency === primaryCurrency.value && r.total > 0)
+  const labels = data.map(r => r.project_name ?? t('client.no_project'))
+  const values = data.map(r => r.total)
+  return { labels, values }
+})
+
+const projectsTable = computed(() => {
+  // Tabulka — seřazená podle obratu sestupně, jen položky s nenulovým obratem.
+  return (client.value?.revenue_by_project ?? []).filter(r => r.total !== 0)
 })
 
 // Smazat lze jen klienta bez navázaných faktur a zakázek (jinak archivovat)
@@ -244,6 +257,43 @@ async function deleteClient() {
             </tr>
           </tbody>
         </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Obrat podle zakázek — graf + tabulka -->
+    <div v-if="projectsTable.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+        <div class="flex items-baseline justify-between mb-3">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500">{{ t('client.revenue_by_project') }}</h3>
+          <span class="text-xs font-mono text-neutral-500">{{ primaryCurrency }}</span>
+        </div>
+        <TopProjectsBarChart :labels="projectsChart.labels" :values="projectsChart.values" :currency="primaryCurrency" />
+      </div>
+      <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-3">{{ t('client.revenue_by_project_table') }}</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-xs text-neutral-500 uppercase tracking-wide">
+              <tr>
+                <th class="text-left py-2 font-medium">{{ t('project.name') }}</th>
+                <th class="text-right py-2 font-medium">{{ t('common.revenue') }}</th>
+                <th class="text-right py-2 pl-3 font-medium whitespace-nowrap">{{ t('client.invoices_short') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-100">
+              <tr v-for="r in projectsTable" :key="`p-${r.project_id ?? 'none'}-${r.currency}`">
+                <td class="py-2 truncate max-w-[220px]">
+                  <RouterLink v-if="r.project_id" :to="`/projects/${r.project_id}`" class="text-primary-700 hover:underline">
+                    {{ r.project_name }}
+                  </RouterLink>
+                  <span v-else class="text-neutral-400 italic">{{ t('client.no_project') }}</span>
+                </td>
+                <td class="py-2 text-right font-mono">{{ formatMoney(r.total, r.currency) }}</td>
+                <td class="py-2 pl-3 text-right text-xs text-neutral-500">{{ r.count }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

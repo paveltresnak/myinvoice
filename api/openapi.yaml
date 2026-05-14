@@ -209,13 +209,27 @@ paths:
         schema: { type: integer, format: int64 }
     get:
       tags: [Clients]
-      summary: Detail klienta
+      summary: Detail klienta se statistikami
+      description: |
+        Vrátí klienta + odvozené metriky pro detail stránku:
+
+        - `projects` — seznam zakázek klienta,
+        - `invoices_count` — celkový počet faktur,
+        - `revenue_by_month` — obrat po měsících za posledních 24 měsíců (VAT-aware),
+        - `revenue_by_year` — obrat po letech (VAT-aware),
+        - `revenue_by_project` — obrat agregovaný per zakázka pro graf „Obrat podle zakázek"
+          (faktury bez `project_id` se agregují pod `project_id: null`),
+        - `unpaid_summary` — nezaplaceno / po splatnosti per měna.
+
+        Obraty zahrnují vystavené faktury + dobropisy (`issued`, `sent`,
+        `reminded`, `paid`), zálohy a koncepty se nepočítají. Pro plátce DPH
+        se používá `total_without_vat`, pro neplátce `total_with_vat`.
       responses:
         '200':
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Client' }
+              schema: { $ref: '#/components/schemas/ClientDetail' }
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -713,12 +727,25 @@ paths:
   /api/v1/projects/stats:
     get:
       tags: [Projects]
-      summary: Agregované statistiky zakázek (pro dashboard)
+      summary: Agregované statistiky zakázek (pro dashboard a stránku Grafy)
+      description: |
+        Vrací agregace pro vizualizace na stránce **Grafy** (`/stats`):
+
+        - **top_this_year / top_prev_year** — top 12 zakázek + agregovaná položka „Ostatní"
+        - **top_12m** — top 12 zakázek za rolling 12 měsíců (smart-mix tabulky v UI;
+          v lednu jsou per-rok statistiky téměř prázdné, rolling 12m je robustní)
+        - **totals_per_year** — sumy + počty per (year, currency)
+        - **status_breakdown** — counts per status (active/paused/closed)
+        - **is_vat_payer** — určuje, který sloupec se použil pro agregaci obratu
+          (plátce = `total_without_vat`, neplátce = `total_with_vat`)
       parameters:
         - $ref: '#/components/parameters/SupplierIdHeader'
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectStats' }
 
   /api/v1/invoices/{id}/work-report:
     parameters:
@@ -1409,17 +1436,39 @@ paths:
       - $ref: '#/components/parameters/SupplierIdHeader'
     get:
       tags: [Reports]
-      summary: Dashboard summary — KPI, top klienti, obrat po měsících
+      summary: Dashboard summary — KPI, top klienti, obrat, forecasty, statistiky
       description: |
-        Agregovaná data pro custom dashboardy. Obsah:
-        - **kpi**: obrat za rok (per měna) vs loni, počet vystavených, průměrná
-          doba splatnosti, status counts,
-        - **overdue**: faktury po splatnosti (počet + suma per měna),
-        - **unpaid_upcoming**: blížící se splatnost,
-        - **top_clients_ytd / top_clients_prev_year**: top 10 klientů dle obratu,
-        - **revenue_by_month**: 12 měsíců zpátky per měna,
-        - **pending_approvals**: počet žádostí o schválení výkazu (requested + overdue),
-        - **today / year / prev_year**.
+        Agregovaná data pro Dashboard i stránku Grafy (`/stats`). Endpoint
+        sjednocuje desítky agregací do jednoho dotazu (cache je řízena DB
+        cache tabulkami `*_revenue_cache`).
+
+        **Obrat (VAT-aware):**
+        Pro plátce DPH (`supplier.is_vat_payer = 1`) se ve všech agregacích
+        obratu používá `total_without_vat`; pro neplátce `total_with_vat`.
+        Vrácený flag `is_vat_payer` to indikuje.
+
+        **Obsah:**
+        - **kpi** — obrat per měna (this/prev year + YTD loni) + počty faktur,
+          klientů a zakázek per rok + ø doba úhrady + overdue,
+        - **overdue / unpaid_upcoming** — tabulky faktur po/před splatnosti,
+        - **top_clients_ytd / top_clients_prev_year** — top 12 klientů YTD a loni,
+        - **top_clients_12m** — top 12 klientů za rolling 12 měsíců (smart-mix v UI),
+        - **revenue_by_month** — 12 + 12 měsíců (rolling + prev_year) per měna,
+        - **revenue_by_year** — všechny roky s aktivitou,
+        - **rolling_12m** — plovoucí 12měsíční obrat per měna (+ 12m předtím
+          pro YoY); relevantní pro DPH limit (2 mil. Kč),
+        - **revenue_last_30d** — live obrat za posledních 30 dní per měna,
+        - **revenue_forecast** — predikce ročního obratu (growth-adjusted seasonality),
+        - **cashflow_ytd** — kumulativní inkasované platby letošek vs loni,
+        - **cashflow_forecast** — co přiteče z neuhrazených v 30/60/90 dnech,
+        - **due_buckets** — splatné dnes / tento týden / tento měsíc,
+        - **aging_report** — stáří pohledávek (current/1-30/31-60/61-90/90+),
+        - **payment_days_histogram** — distribuce doby úhrady (12m),
+        - **vat_breakdown_12m** — rozpad obratu per sazba DPH (jen plátce DPH),
+        - **invoice_size_histogram** — distribuce velikosti faktur v CZK ekv.,
+        - **active_clients_count / active_recurring_count** — counts,
+        - **pending_approvals** — počet žádostí o schválení výkazu,
+        - **is_vat_payer / today / year / prev_year** — kontext.
       responses:
         '200':
           description: OK
@@ -2063,6 +2112,58 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    ClientDetail:
+      allOf:
+        - $ref: '#/components/schemas/Client'
+        - type: object
+          properties:
+            projects:
+              type: array
+              items: { $ref: '#/components/schemas/Project' }
+            invoices_count:
+              type: integer
+              description: Celkový počet faktur klienta.
+            revenue_by_month:
+              type: array
+              description: "Obrat po měsících za posledních 24 měsíců (VAT-aware)."
+              items:
+                type: object
+                properties:
+                  month: { type: string, example: "2026-04" }
+                  currency: { type: string }
+                  total: { type: number, format: float }
+            revenue_by_year:
+              type: array
+              description: "Obrat po letech (VAT-aware)."
+              items:
+                type: object
+                properties:
+                  year: { type: integer }
+                  currency: { type: string }
+                  total: { type: number, format: float }
+                  count: { type: integer }
+            revenue_by_project:
+              type: array
+              description: 'Obrat agregovaný per zakázka — pro graf "Obrat podle zakázek". Faktury bez project_id agregovány pod project_id=null.'
+              items:
+                type: object
+                properties:
+                  project_id: { type: integer, nullable: true }
+                  project_name: { type: string, nullable: true }
+                  currency: { type: string }
+                  total: { type: number, format: float }
+                  count: { type: integer }
+            unpaid_summary:
+              type: array
+              items:
+                type: object
+                properties:
+                  currency: { type: string }
+                  unpaid_total:  { type: number, format: float }
+                  unpaid_count:  { type: integer }
+                  overdue_total: { type: number, format: float }
+                  overdue_count: { type: integer }
+
     ClientInput:
       type: object
       required: [company_name, street, city, zip, country_id, main_email]
@@ -2510,23 +2611,40 @@ components:
 
     DashboardSummary:
       type: object
+      description: |
+        Souhrnná data pro Dashboard (homepage) i stránku Grafy (`/stats`).
+
+        **VAT-aware obrat:** Pro plátce DPH (`supplier.is_vat_payer = 1`) se obrat
+        ve všech KPI a grafech počítá z `total_without_vat`; pro neplátce z
+        `total_with_vat`. Flag `is_vat_payer` v response signalizuje použitou
+        variantu.
       properties:
         today: { type: string, format: date }
         year: { type: integer, example: 2026 }
         prev_year: { type: integer, example: 2025 }
+        is_vat_payer:
+          type: boolean
+          description: "Plátce DPH? Určuje použitý sloupec obratu (total_without_vat vs total_with_vat)."
         kpi:
           type: object
           properties:
             per_currency:
               type: array
+              description: "Per měna: obrat YTD + loni + YTD loni (do stejného kalendářního dne) + počty faktur/klientů/zakázek pro každý rok."
               items:
                 type: object
                 properties:
                   currency: { type: string }
                   this_year: { type: number }
                   prev_year: { type: number }
-                  prev_year_ytd: { type: number }
-                  change_pct: { type: number, nullable: true }
+                  prev_year_ytd: { type: number, description: "Obrat loni do stejného dne v roce (pro fair YoY)" }
+                  change_pct: { type: number, nullable: true, description: "Letošek vs prev_year_ytd v %" }
+                  this_year_invoice_count: { type: integer }
+                  prev_year_invoice_count: { type: integer }
+                  this_year_client_count: { type: integer, description: "DISTINCT klienti v této měně (letos)" }
+                  prev_year_client_count: { type: integer }
+                  this_year_project_count: { type: integer, description: "DISTINCT zakázky v této měně (letos)" }
+                  prev_year_project_count: { type: integer }
             issued_count_ytd: { type: integer }
             overdue_count: { type: integer }
             overdue_per_currency:
@@ -2549,30 +2667,250 @@ components:
           items: { $ref: '#/components/schemas/Invoice' }
         top_clients_ytd:
           type: array
-          items:
-            type: object
-            properties:
-              client_id: { type: integer }
-              company_name: { type: string }
-              currency: { type: string }
-              total: { type: number }
-              invoices_count: { type: integer }
+          description: "Top 12 klientů YTD per měna."
+          items: { $ref: '#/components/schemas/TopClient' }
         top_clients_prev_year:
           type: array
-          items: { type: object }
+          description: "Top 12 klientů za minulý rok per měna."
+          items: { $ref: '#/components/schemas/TopClient' }
+        top_clients_12m:
+          type: array
+          description: "Top 12 klientů za rolling posledních 12 měsíců. Robustní vůči začátku roku (kdy YTD je téměř prázdné)."
+          items: { $ref: '#/components/schemas/TopClient' }
         revenue_by_month:
           type: array
+          description: "Per měna: rolling 12 měsíců (`months`) + odpovídajících 12 měsíců o rok dříve (`prev_year`)."
           items:
             type: object
             properties:
-              month: { type: string, example: "2026-04" }
+              currency: { type: string }
+              months:
+                type: array
+                items: { $ref: '#/components/schemas/MonthBucket' }
+              prev_year:
+                type: array
+                items: { $ref: '#/components/schemas/MonthBucket' }
+        revenue_by_year:
+          type: array
+          description: "Obrat po rocích — všechny roky s aktivitou, VAT-aware."
+          items:
+            type: object
+            properties:
+              year: { type: integer }
               currency: { type: string }
               total: { type: number }
+              invoice_count: { type: integer }
+        rolling_12m:
+          type: array
+          description: "Plovoucí 12měsíční obrat (rolling) per měna + 12 měsíců předtím (pro rolling YoY srovnání). Relevantní pro DPH limit 2 000 000 Kč."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              total: { type: number, description: "Obrat za posledních 12 měsíců (rolling)" }
+              prev_period_total: { type: number, description: "Obrat za 12 měsíců předtím" }
+        revenue_last_30d:
+          type: array
+          description: "Live indikátor obratu za posledních 30 dní per měna."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              total: { type: number }
+              invoice_count: { type: integer }
+        revenue_forecast:
+          type: array
+          description: |
+            Forecast ročního obratu — growth-adjusted seasonality.
+
+            **Vzorec:** `forecast = YTD_letos + (prev_year_remainder × growth_ratio)`,
+            kde `growth_ratio = YTD_letos / YTD_loni_do_stejného_dne` (capnut na [0.3, 3.0]).
+            Tj. predikce zbytku roku z loňské sezonality, škálovaná aktuálním YoY růstem.
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              ytd: { type: number, description: "Obrat letos Jan 1 – dnes" }
+              prev_year_ytd: { type: number, description: "Obrat loni Jan 1 – stejný den" }
+              prev_year_remainder: { type: number, description: "Obrat loni od dneška do konce roku (sezonalita)" }
+              growth_ratio: { type: number, description: "YTD_letos / YTD_loni, cap [0.3, 3.0]" }
+              forecast: { type: number, description: "Predikovaný celoroční obrat" }
+              prev_year_full: { type: number, description: "Celý loňský rok pro srovnání" }
+        cashflow_ytd:
+          type: array
+          description: "Měsíční cash-flow (skutečné platby `paid_at`) letošek + minulý rok per měna. Doplňuje obrat o reálné inkaso."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              months:
+                type: array
+                items: { $ref: '#/components/schemas/MonthBucket' }
+              prev_year:
+                type: array
+                items: { $ref: '#/components/schemas/MonthBucket' }
+        cashflow_forecast:
+          type: array
+          description: "Kumulativní cash-flow forecast — co přiteče z neuhrazených faktur v příštích 30/60/90 dnech."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              in_30: { type: number }
+              in_60: { type: number }
+              in_90: { type: number }
+              count_30: { type: integer }
+              count_60: { type: integer }
+              count_90: { type: integer }
+        due_buckets:
+          type: array
+          description: "Splatnost neuhrazených faktur — kumulativně dnes / tento týden (Po-Ne) / tento měsíc."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              today_count: { type: integer }
+              today_total: { type: number }
+              week_count: { type: integer }
+              week_total: { type: number }
+              month_count: { type: integer }
+              month_total: { type: number }
+        aging_report:
+          type: array
+          description: "Aging report — stáří pohledávek po splatnosti v bucketech per měna."
+          items:
+            type: object
+            properties:
+              currency: { type: string }
+              current: { type: number, description: "Ještě před splatností" }
+              b1_30: { type: number, description: "1–30 dní po splatnosti" }
+              b31_60: { type: number }
+              b61_90: { type: number }
+              b90_plus: { type: number, description: "Více než 90 dní po splatnosti" }
+              current_n: { type: integer }
+              b1_30_n: { type: integer }
+              b31_60_n: { type: integer }
+              b61_90_n: { type: integer }
+              b90_plus_n: { type: integer }
+        payment_days_histogram:
+          type: object
+          description: "Distribuce doby úhrady (`paid_at - issue_date`) za posledních 12 měsíců."
+          properties:
+            buckets:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string, enum: ["0-7", "8-14", "15-30", "30+"] }
+                  label: { type: string }
+                  count: { type: integer }
+            total: { type: integer }
+            avg_days: { type: number, nullable: true }
+        vat_breakdown_12m:
+          type: array
+          description: |
+            Rozpad obratu (base bez DPH) podle sazby DPH — **pouze pro plátce DPH**.
+            Pro neplátce vrací prázdné pole. Per měna a `vat_rate_snapshot`.
+            Reverse-charge řádky jsou vyznačeny labelem „RC (reverse charge)".
+          items:
+            type: object
+            properties:
+              label: { type: string, example: "21 %" }
+              base: { type: number, description: "Suma total_without_vat" }
+              currency: { type: string }
+        invoice_size_histogram:
+          type: object
+          description: "Histogram velikosti faktur za posledních 12 měsíců. Buckety v CZK ekvivalentu (non-CZK přepočtené přes `exchange_rate`)."
+          properties:
+            buckets:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string, enum: ["0-5", "5-25", "25-100", "100+"] }
+                  label: { type: string }
+                  count: { type: integer }
+                  total_czk: { type: number }
+            total: { type: integer }
+        active_clients_count:
+          type: integer
+          description: "Počet nearchivovaných klientů aktuálního dodavatele."
+        active_recurring_count:
+          type: integer
+          description: "Počet aktivních šablon pravidelné fakturace."
         pending_approvals:
           type: object
           properties:
             requested: { type: integer }
             overdue: { type: integer, description: "Bez reakce > 5 dní" }
+
+    TopClient:
+      type: object
+      properties:
+        client_id: { type: integer }
+        company_name: { type: string }
+        currency: { type: string }
+        total: { type: number }
+        invoice_count: { type: integer }
+
+    MonthBucket:
+      type: object
+      properties:
+        ym: { type: string, example: "2026-04", description: "Měsíc ve formátu YYYY-MM" }
+        total: { type: number }
+
+    ProjectStats:
+      type: object
+      description: "Statistiky zakázek pro stránku Grafy. VAT-aware (viz `is_vat_payer`)."
+      properties:
+        this_year: { type: integer, example: 2026 }
+        prev_year: { type: integer, example: 2025 }
+        primary_currency:
+          type: string
+          description: "Nejvyužívanější měna ve fakturách — používá se k filtrování per-currency agregací."
+        is_vat_payer: { type: boolean }
+        top_this_year: { $ref: '#/components/schemas/ProjectStatsBlock' }
+        top_prev_year: { $ref: '#/components/schemas/ProjectStatsBlock' }
+        top_12m:
+          allOf:
+            - $ref: '#/components/schemas/ProjectStatsBlock'
+            - description: "Top 12 zakázek za rolling posledních 12 měsíců. Robustní vůči začátku roku."
+        totals_per_year:
+          type: array
+          items:
+            type: object
+            properties:
+              year: { type: integer }
+              currency: { type: string }
+              total: { type: number }
+              invoice_count: { type: integer }
+        status_breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { type: string, enum: [active, paused, closed] }
+              count: { type: integer }
+
+    ProjectStatsBlock:
+      type: object
+      properties:
+        top:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              client_company_name: { type: string }
+              revenue: { type: number }
+              invoice_count: { type: integer }
+        others:
+          type: object
+          description: 'Agregovaná položka "Ostatní" (mimo top 12).'
+          properties:
+            revenue: { type: number }
+            count: { type: integer }
 
     BankStatement:
       type: object

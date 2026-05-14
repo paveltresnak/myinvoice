@@ -98,6 +98,8 @@ export interface ProjectStats {
   primary_currency: string
   top_this_year: { top: ProjectStatsTopItem[]; others: { revenue: number; count: number } }
   top_prev_year: { top: ProjectStatsTopItem[]; others: { revenue: number; count: number } }
+  top_12m: { top: ProjectStatsTopItem[]; others: { revenue: number; count: number } }
   totals_per_year: Array<{ year: number; currency: string; total: number; invoice_count: number }>
   status_breakdown: Array<{ status: 'active' | 'paused' | 'closed'; count: number }>
+  is_vat_payer: boolean
 }

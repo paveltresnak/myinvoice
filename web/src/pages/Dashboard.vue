@@ -7,9 +7,8 @@ import { useAuthStore } from '@/stores/auth'
 const { t } = useI18n()
 import { dashboardApi, type DashboardSummary } from '@/api/dashboard'
 import { formatMoney, formatDate } from '@/composables/useFormat'
-import RevenueChart from '@/components/charts/RevenueChart.vue'
+import SparklineChart from '@/components/charts/SparklineChart.vue'
 import TopClientsPieChart from '@/components/charts/TopClientsPieChart.vue'
-import StatusDoughnutChart from '@/components/charts/StatusDoughnutChart.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -56,11 +55,6 @@ const upcomingPerCurrency = computed(() => {
   return Array.from(map, ([currency, total]) => ({ currency, total }))
 })
 
-const hasAnyRevenue = computed(() => {
-  if (!summary.value) return false
-  return summary.value.kpi.per_currency.some(c => c.this_year > 0 || c.prev_year > 0)
-})
-
 const hasAnyData = computed(() => {
   if (!summary.value) return false
   return summary.value.kpi.issued_count_ytd > 0
@@ -70,6 +64,32 @@ const hasAnyData = computed(() => {
 
 function openInvoice(id: number) {
   router.push(`/invoices/${id}`)
+}
+
+/**
+ * Vrátí 12 posledních měsíců dat pro sparkline daného currency.
+ * Bere `revenue_by_month[currency].months` (12 měsíců rolling).
+ */
+/** Primární měna pro Top klienti pie — měna s největším součtem v top_clients_12m. */
+const topClientsPrimaryCurrency = computed(() => {
+  const items = summary.value?.top_clients_12m ?? []
+  if (!items.length) return 'CZK'
+  const byCurrency = new Map<string, number>()
+  for (const it of items) byCurrency.set(it.currency, (byCurrency.get(it.currency) ?? 0) + it.total)
+  const sorted = Array.from(byCurrency.entries()).sort((a, b) => b[1] - a[1])
+  return sorted[0]?.[0] ?? 'CZK'
+})
+
+function sparklineFor(currency: string): { labels: string[]; values: number[] } {
+  const rev = summary.value?.revenue_by_month.find(r => r.currency === currency)
+  if (!rev) return { labels: [], values: [] }
+  return {
+    labels: rev.months.map(m => {
+      const [y, mo] = m.ym.split('-')
+      return `${mo}/${y}`
+    }),
+    values: rev.months.map(m => m.total),
+  }
 }
 </script>
 
@@ -124,6 +144,14 @@ function openInvoice(id: number) {
             {{ c.change_pct >= 0 ? '▲' : '▼' }} {{ Math.abs(c.change_pct) }} % {{ t('dashboard.vs_prev_ytd', { year: summary.prev_year }) }}
           </div>
           <div v-else class="text-xs text-neutral-400 mt-1">{{ t('dashboard.no_prev_year', { year: summary.prev_year }) }}</div>
+          <!-- Sparkline 12m pod částkou — vizuální trend. -->
+          <div class="mt-3" v-if="sparklineFor(c.currency).values.some(v => v !== 0)">
+            <SparklineChart
+              :labels="sparklineFor(c.currency).labels"
+              :values="sparklineFor(c.currency).values"
+              :format="(v: number) => formatMoney(v, c.currency)"
+            />
+          </div>
         </div>
 
         <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
@@ -185,36 +213,54 @@ function openInvoice(id: number) {
         </RouterLink>
       </div>
 
-      <!-- Top klienti — koláč 2026 + 2025 vedle sebe -->
-      <div v-if="(summary.top_clients_ytd.length + summary.top_clients_prev_year.length) > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">
-            {{ t('dashboard.top_clients_year', { year: summary.year }) }}
-          </h3>
-          <TopClientsPieChart :clients="summary.top_clients_ytd" currency="CZK" />
+      <!-- Splatnost: dnes / tento týden / tento měsíc — kumulativní karty -->
+      <div v-if="summary.due_buckets.length" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div v-for="b in summary.due_buckets" :key="`db-today-${b.currency}`"
+          class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm"
+          :class="{ 'border-warning-500/40 bg-warning-50/20': b.today_count > 0 }">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 mb-1">{{ t('dashboard.due_today') }}</div>
+          <div class="text-2xl font-semibold" :class="b.today_count > 0 ? 'text-warning-600' : 'text-neutral-300'">
+            {{ b.today_count }}
+          </div>
+          <div class="text-xs mt-1 font-mono" :class="b.today_count > 0 ? 'text-neutral-700' : 'text-neutral-400'">
+            {{ formatMoney(b.today_total, b.currency) }}
+          </div>
         </div>
-        <!-- Pokud je minulý rok prázdný, místo prázdné pie zobraz stav faktur YTD -->
-        <div v-if="summary.top_clients_prev_year.length > 0" class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">
-            {{ t('dashboard.top_clients_year', { year: summary.prev_year }) }}
-          </h3>
-          <TopClientsPieChart :clients="summary.top_clients_prev_year" currency="CZK" />
+        <div v-for="b in summary.due_buckets" :key="`db-week-${b.currency}`"
+          class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 mb-1">{{ t('dashboard.due_this_week') }}</div>
+          <div class="text-2xl font-semibold text-neutral-900">{{ b.week_count }}</div>
+          <div class="text-xs mt-1 font-mono text-neutral-500">{{ formatMoney(b.week_total, b.currency) }}</div>
         </div>
-        <div v-else class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">
-            {{ t('dashboard.status_for_year', { year: summary.year }) }}
-          </h3>
-          <StatusDoughnutChart :counts="summary.kpi.status_counts_ytd || {}" />
+        <div v-for="b in summary.due_buckets" :key="`db-month-${b.currency}`"
+          class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 mb-1">{{ t('dashboard.due_this_month') }}</div>
+          <div class="text-2xl font-semibold text-neutral-900">{{ b.month_count }}</div>
+          <div class="text-xs mt-1 font-mono text-neutral-500">{{ formatMoney(b.month_total, b.currency) }}</div>
         </div>
       </div>
 
-      <!-- Revenue chart per currency — posledních 12 měsíců (rolling) -->
-      <div v-if="hasAnyRevenue" class="space-y-4">
-        <div v-for="rev in summary.revenue_by_month" :key="rev.currency" class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">
-            {{ t('dashboard.revenue_last_12_months', { currency: rev.currency }) }}
-          </h3>
-          <RevenueChart :months="rev.months" :prev-year="rev.prev_year" :currency="rev.currency" />
+      <!-- Cash-flow forecast 30 / 60 / 90 dní — kolik se očekává inkasovat -->
+      <div v-if="summary.cashflow_forecast.length" class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+        <div class="flex items-baseline justify-between mb-4">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500">{{ t('dashboard.cashflow_forecast') }}</h3>
+          <span class="text-xs text-neutral-400">{{ t('dashboard.cashflow_forecast_hint') }}</span>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div v-for="period in ['30','60','90']" :key="`cf-${period}`" class="text-center">
+            <div class="text-xs uppercase tracking-wide text-neutral-500 mb-1">{{ t('dashboard.cashflow_in_days', { n: period }) }}</div>
+            <div class="space-y-0.5">
+              <div v-for="cf in summary.cashflow_forecast" :key="`cf-${period}-${cf.currency}`"
+                class="font-mono text-lg font-semibold text-neutral-900">
+                {{ formatMoney(period === '30' ? cf.in_30 : period === '60' ? cf.in_60 : cf.in_90, cf.currency) }}
+              </div>
+            </div>
+            <div class="text-xs text-neutral-500 mt-1">
+              <span v-for="cf in summary.cashflow_forecast" :key="`cf-cnt-${period}-${cf.currency}`">
+                {{ period === '30' ? cf.count_30 : period === '60' ? cf.count_60 : cf.count_90 }} {{ t('dashboard.invoices_unit') }}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -320,10 +366,11 @@ function openInvoice(id: number) {
         </div>
       </div>
 
-      <!-- Top klienti YTD -->
-      <div v-if="summary.top_clients_ytd.length" class="bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden">
+      <!-- Top klienti — posledních 12 měsíců: tabulka vlevo, koláč vpravo -->
+      <div v-if="summary.top_clients_12m.length" class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div class="bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden">
         <header class="px-5 py-3 border-b border-neutral-200">
-          <h3 class="font-semibold">{{ t('dashboard.top_clients_year', { year: summary.year }) }}</h3>
+          <h3 class="font-semibold">{{ t('dashboard.top_clients_12m') }}</h3>
         </header>
         <!-- Desktop: tabulka -->
         <div class="hidden md:block overflow-x-auto">
@@ -338,7 +385,7 @@ function openInvoice(id: number) {
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100">
-            <tr v-for="(c, i) in summary.top_clients_ytd" :key="c.client_id + c.currency" class="hover:bg-neutral-50 cursor-pointer"
+            <tr v-for="(c, i) in summary.top_clients_12m" :key="c.client_id + c.currency" class="hover:bg-neutral-50 cursor-pointer"
                 @click="router.push(`/clients/${c.client_id}`)">
               <td class="px-4 py-2.5 text-neutral-400 font-mono text-xs">{{ i + 1 }}</td>
               <td class="px-4 py-2.5 font-medium">{{ c.company_name }}</td>
@@ -346,7 +393,7 @@ function openInvoice(id: number) {
               <td class="px-4 py-2.5 text-right font-mono">{{ formatMoney(c.total, c.currency) }}</td>
               <td class="px-4 py-2.5">
                 <div class="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                  <div class="h-full bg-primary-500 rounded-full" :style="{ width: (c.total / summary.top_clients_ytd[0].total * 100) + '%' }"></div>
+                  <div class="h-full bg-primary-500 rounded-full" :style="{ width: (c.total / summary.top_clients_12m[0].total * 100) + '%' }"></div>
                 </div>
               </td>
             </tr>
@@ -356,7 +403,7 @@ function openInvoice(id: number) {
 
         <!-- Mobile: kompaktní list s share bar -->
         <div class="md:hidden divide-y divide-neutral-100">
-          <div v-for="(c, i) in summary.top_clients_ytd" :key="`m-${c.client_id}-${c.currency}`"
+          <div v-for="(c, i) in summary.top_clients_12m" :key="`m-${c.client_id}-${c.currency}`"
             @click="router.push(`/clients/${c.client_id}`)"
             class="cursor-pointer hover:bg-neutral-50 px-3 py-2.5">
             <div class="flex items-baseline justify-between gap-2">
@@ -368,12 +415,22 @@ function openInvoice(id: number) {
             </div>
             <div class="flex items-center gap-2 mt-1.5">
               <div class="h-1.5 flex-1 bg-neutral-100 rounded-full overflow-hidden">
-                <div class="h-full bg-primary-500 rounded-full" :style="{ width: (c.total / summary.top_clients_ytd[0].total * 100) + '%' }"></div>
+                <div class="h-full bg-primary-500 rounded-full" :style="{ width: (c.total / summary.top_clients_12m[0].total * 100) + '%' }"></div>
               </div>
               <span class="text-xs text-neutral-500 font-mono whitespace-nowrap">{{ c.invoice_count }}×</span>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Koláč Top klienti — totožná data, druhý úhel pohledu -->
+      <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+        <div class="flex items-baseline justify-between mb-4">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500">{{ t('dashboard.top_clients_12m_share') }}</h3>
+          <span class="text-xs font-mono text-neutral-500">{{ topClientsPrimaryCurrency }}</span>
+        </div>
+        <TopClientsPieChart :clients="summary.top_clients_12m" :currency="topClientsPrimaryCurrency" />
+      </div>
       </div>
     </div>
   </div>

@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.6.3] — 2026-05-14
+
+### Added
+
+- **Nová stránka „Grafy"** (`/stats`) — kompletní reporting hub. Položka
+  v hlavním menu mezi Zakázky a Faktury. Obsahuje:
+  - 9 KPI tilů (3×3 grid): plovoucí 12měsíční obrat s DPH-limit indikátorem
+    (2 000 000 Kč pro CZK plátce), obrat letošek/loni s YoY %, **Forecast
+    aktuálního roku** (growth-adjusted seasonality — YTD + sezonalita loni
+    × YoY růst), počet faktur/klientů/zakázek per měna per rok, počet
+    aktivních klientů + recurring šablon, Ø doba úhrady, obrat 30 dní.
+  - Grafy: měsíční obrat 12m bar + prev-year linka, **kumulativní YTD vs
+    loni** (CumulativeYtdChart), Top klienti koláč YTD + loni, Top zakázky
+    bar YTD + loni, status donuty (faktury + zakázky).
+  - **Concentration risk** — % obratu z TOP3/TOP5 klientů za rolling 12m
+    s 3 úrovněmi warning (≥50/70 % a ≥70/90 %).
+  - **Histogram doby úhrady** — 0-7 / 8-14 / 15-30 / 30+ dní + Ø dní.
+  - **DPH rozpad obratu** — donut per sazba (21 % / 12 % / 0 % / RC),
+    pouze pro plátce DPH.
+  - **Cash-flow YTD** — kumulativní křivka skutečných plateb (`paid_at`)
+    letošek vs loni; doplňuje obrat o reálné inkaso.
+  - **Aging report** — stáří pohledávek (current / 1-30 / 31-60 / 61-90 /
+    90+ dní) per měna, stacked horizontal bar + číselná tabulka.
+  - **Distribuce velikosti faktur** — bar chart 0-5k / 5-25k / 25-100k /
+    100k+ Kč (CZK ekvivalent přes uložený `exchange_rate`).
+  - Číselné tabulky: obrat po rocích (s forecast řádkem nahoře),
+    obrat po měsících (12), Top 12 klientů + zakázek za rolling 12m.
+- **VAT-aware obrat** napříč celou aplikací. Plátci DPH
+  (`supplier.is_vat_payer = 1`) vidí ve všech statistikách / grafech /
+  cache `total_without_vat` (relevantní pro DPH limit a fair reporting);
+  neplátci `total_with_vat`. Týká se Dashboard, Grafy, detail klienta,
+  detail zakázky a cache tabulek (`client_revenue_cache` /
+  `project_revenue_cache`).
+- **Detail klienta — graf „Obrat podle zakázek"** + číselná tabulka
+  agregovaná per zakázka. Klikatelné na detail zakázky. Faktury bez
+  `project_id` agregované pod „(bez zakázky)".
+- **Dashboard — oživení homepage:**
+  - Sparkline 12měsíční obrat (mini bar chart) pod částkou v KPI tile
+    „Obrat 2026 (CZK)".
+  - **Cash-flow forecast** — 3 boxy „Co přiteče z neuhrazených faktur
+    v příštích 30 / 60 / 90 dnech" per měna.
+  - **Splatnost karty** — Splatné dnes / tento týden / tento měsíc
+    (kumulativně) s warning barvou pro „dnes > 0".
+  - „Top klienti — 12 měsíců" tabulka teď vlevo na 50 %, vedle ní
+    doughnut graf se stejnými daty (Top 8 + Ostatní).
+- **Reorganizace navigace** — „Banka" přesunuta do submenu Systém
+  (za Dodavatelé). Top-level highlight Systém zahrnuje i `/bank/*` route.
+- **Nové komponenty grafů:** `CumulativeYtdChart`, `SparklineChart`,
+  `PaymentDaysHistogramChart`, `VatBreakdownChart`, `AgingChart`,
+  `InvoiceSizeChart`.
+- **Nové stored procedures + cache rebuild** — `sp_recompute_*`
+  přepsány aby používaly VAT-aware sloupec dle dodavatele
+  (JOIN `supplier` ON `is_vat_payer`). Migrace `0023` automaticky volá
+  `sp_recompute_all_caches()` po nasazení.
+
+### Fixed
+
+- **Forecast ročního obratu — matematická duplikace s rolling 12m.**
+  Předchozí vzorec `YTD + prev_year_remainder` dával identický výsledek
+  jako plovoucí 12měsíční obrat (stejné kalendářní okno, jen rozdělené).
+  Nový vzorec: `forecast = YTD + (prev_year_remainder × growth_ratio)`,
+  kde `growth_ratio = YTD_letos / YTD_loni_do_stejného_dne` (cap [0.3, 3.0]).
+  Predikce zbytku roku z loňské sezonality, škálovaná aktuálním YoY růstem.
+- **`SummaryAction::activeRecurringCount` — špatný název tabulky.**
+  Použito `recurring_templates`, správně je `recurring_invoice_templates`.
+- **OpenAPI YAML parser error** na ř. 2147 — české uvozovky `„…"` uvnitř
+  `"…"` YAML stringů (ASCII `"` předčasně ukončoval string).
+  Přepsáno na single-quote YAML stringy.
+
+### Documentation
+
+- **OpenAPI 3.1 spec rozšířena** o všechny nové fieldy v
+  `/dashboard/summary` (cca 20 nových sekcí response) a `/projects/stats`
+  (`top_12m`, `is_vat_payer`). Nová schemas:
+  - `TopClient`, `MonthBucket` (sdílené reusable schemas)
+  - `ProjectStats` + `ProjectStatsBlock` (pro `/projects/stats`)
+  - `ClientDetail` (`allOf` extend Client + revenue agregace pro
+    `/clients/{id}`, vč. nového `revenue_by_project`)
+  - `DashboardSummary` doplněn o `top_clients_12m`, `revenue_by_year`,
+    `rolling_12m`, `revenue_last_30d`, `revenue_forecast`, `cashflow_ytd`,
+    `cashflow_forecast`, `due_buckets`, `aging_report`,
+    `payment_days_histogram`, `vat_breakdown_12m`,
+    `invoice_size_histogram`, `active_clients_count`,
+    `active_recurring_count`, `is_vat_payer`.
+
+### Migration
+
+- **`0023_revenue_vat_aware.sql`** — `DROP + CREATE` pro
+  `sp_recompute_client_revenue`, `sp_recompute_project_revenue`,
+  `sp_recompute_all_caches`. Nový JOIN na `supplier` a `CASE WHEN
+  is_vat_payer = 1 THEN total_without_vat ELSE total_with_vat END`.
+  Idempotentní; volá `CALL sp_recompute_all_caches()` na konci pro
+  okamžitý přepočet existující cache.
+
+---
+
 ## [3.6.2] — 2026-05-14
 
 ### Added

@@ -32,12 +32,18 @@ final class GetClientAction
         $stmt->execute([$id]);
         $client['invoices_count'] = (int) $stmt->fetchColumn();
 
+        // VAT-aware obrat — plátci DPH vidí čísla bez DPH (relevantní pro DPH limit),
+        // neplátci s DPH (fakturované částky odpovídají reálnému inkasu).
+        $vatStmt = $pdo->prepare('SELECT is_vat_payer FROM supplier WHERE id = ?');
+        $vatStmt->execute([$sid]);
+        $rev = ((bool) $vatStmt->fetchColumn()) ? 'i.total_without_vat' : 'i.total_with_vat';
+
         // Obrat po měsících za posledních 24 měsíců.
         // Zahrnuje invoice + credit_note (dobropis má záporné částky, automaticky odečte).
         // Vyloučeno: koncepty (draft), zálohovky (proforma), storno (cancelled), interní cancellation.
         $stmtM = $pdo->prepare(
             "SELECT DATE_FORMAT(COALESCE(i.tax_date, i.issue_date), '%Y-%m') AS month,
-                    cur.code AS currency, SUM(i.total_with_vat) AS total
+                    cur.code AS currency, SUM($rev) AS total
                FROM invoices i
                JOIN currencies cur ON cur.id = i.currency_id
               WHERE i.client_id = ?
@@ -57,7 +63,7 @@ final class GetClientAction
         // vyloučí draft/proforma/cancelled/cancellation.
         $stmtY = $pdo->prepare(
             "SELECT YEAR(COALESCE(i.tax_date, i.issue_date)) AS year,
-                    cur.code AS currency, SUM(i.total_with_vat) AS total, COUNT(*) AS count
+                    cur.code AS currency, SUM($rev) AS total, COUNT(*) AS count
                FROM invoices i
                JOIN currencies cur ON cur.id = i.currency_id
               WHERE i.client_id = ?
@@ -75,6 +81,33 @@ final class GetClientAction
                 'count' => (int) $r['count'],
             ],
             $stmtY->fetchAll(\PDO::FETCH_ASSOC)
+        );
+
+        // Obrat po zakázkách — pro graf "Obrat podle zakázek" v detailu klienta.
+        // Stejná pravidla jako revenue_by_month / revenue_by_year.
+        // Faktury bez project_id se agregují pod label "(bez zakázky)" (project_id NULL).
+        $stmtP = $pdo->prepare(
+            "SELECT i.project_id, p.name AS project_name,
+                    cur.code AS currency, SUM($rev) AS total, COUNT(*) AS count
+               FROM invoices i
+               JOIN currencies cur ON cur.id = i.currency_id
+          LEFT JOIN projects p ON p.id = i.project_id
+              WHERE i.client_id = ?
+                AND i.status IN ('issued', 'sent', 'reminded', 'paid')
+                AND i.invoice_type IN ('invoice', 'credit_note')
+              GROUP BY i.project_id, p.name, cur.code
+              ORDER BY total DESC"
+        );
+        $stmtP->execute([$id]);
+        $client['revenue_by_project'] = array_map(
+            fn (array $r) => [
+                'project_id'   => $r['project_id'] !== null ? (int) $r['project_id'] : null,
+                'project_name' => $r['project_name'],
+                'currency'     => $r['currency'],
+                'total'        => (float) $r['total'],
+                'count'        => (int) $r['count'],
+            ],
+            $stmtP->fetchAll(\PDO::FETCH_ASSOC)
         );
 
         // Nezaplaceno (issued/sent + invoice/credit_note) + Po splatnosti per měna

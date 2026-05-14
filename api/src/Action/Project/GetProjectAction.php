@@ -31,12 +31,18 @@ final class GetProjectAction
         $stmt->execute([$id]);
         $project['invoices_count'] = (int) $stmt->fetchColumn();
 
+        // VAT-aware obrat — plátci DPH vidí čísla bez DPH (relevantní pro DPH limit),
+        // neplátci s DPH (fakturované částky odpovídají reálnému inkasu).
+        $vatStmt = $pdo->prepare('SELECT is_vat_payer FROM supplier WHERE id = ?');
+        $vatStmt->execute([$sid]);
+        $rev = ((bool) $vatStmt->fetchColumn()) ? 'i.total_without_vat' : 'i.total_with_vat';
+
         // Obrat po měsících za posledních 24 měsíců.
         // Zahrnuje invoice + credit_note (dobropis má záporné částky, automaticky odečte).
         // Vyloučeno: koncepty (draft), zálohovky (proforma), storno (cancelled), interní cancellation.
         $stmtM = $pdo->prepare(
             "SELECT DATE_FORMAT(COALESCE(i.tax_date, i.issue_date), '%Y-%m') AS month,
-                    cur.code AS currency, SUM(i.total_with_vat) AS total
+                    cur.code AS currency, SUM($rev) AS total
                FROM invoices i
                JOIN currencies cur ON cur.id = i.currency_id
               WHERE i.project_id = ?
@@ -56,7 +62,7 @@ final class GetProjectAction
         // vyloučí draft/proforma/cancelled/cancellation.
         $stmtY = $pdo->prepare(
             "SELECT YEAR(COALESCE(i.tax_date, i.issue_date)) AS year,
-                    cur.code AS currency, SUM(i.total_with_vat) AS total, COUNT(*) AS count
+                    cur.code AS currency, SUM($rev) AS total, COUNT(*) AS count
                FROM invoices i
                JOIN currencies cur ON cur.id = i.currency_id
               WHERE i.project_id = ?

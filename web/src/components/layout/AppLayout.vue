@@ -44,7 +44,7 @@ const navItems = computed<NavItem[]>(() => {
     { to: '/invoices', label: t('nav.invoices'),   icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z' },
     { to: '/clients',  label: t('nav.clients'),    icon: 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a3 3 0 0 1 5.356-1.857M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0z' },
     { to: '/projects', label: t('nav.projects'),   icon: 'M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4' },
-    { to: '/bank',     label: t('nav.bank'),       icon: 'M3 9l9-7 9 7m-2 0v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9m4 11V13h4v7' },
+    { to: '/stats',    label: t('nav.stats'),      icon: 'M3 3v18h18M7 14l4-4 4 4 5-5' },
   ]
   if (auth.user?.role === 'admin') {
     items.push({
@@ -53,6 +53,7 @@ const navItems = computed<NavItem[]>(() => {
       children: [
         { to: '/admin/settings',     label: t('nav.settings'),   icon: 'M10.325 4.317a1 1 0 0 1 1.94 0l.31 1.241a7.5 7.5 0 0 1 2.106.873l1.097-.633a1 1 0 0 1 1.371.366l.97 1.683a1 1 0 0 1-.366 1.366l-1.094.632a7.5 7.5 0 0 1 0 2.428l1.094.632a1 1 0 0 1 .366 1.366l-.97 1.683a1 1 0 0 1-1.371.366l-1.097-.633a7.5 7.5 0 0 1-2.106.873l-.31 1.241a1 1 0 0 1-1.94 0l-.31-1.241a7.5 7.5 0 0 1-2.106-.873l-1.097.633a1 1 0 0 1-1.371-.366l-.97-1.683a1 1 0 0 1 .366-1.366l1.094-.632a7.5 7.5 0 0 1 0-2.428l-1.094-.632a1 1 0 0 1-.366-1.366l.97-1.683a1 1 0 0 1 1.371-.366l1.097.633a7.5 7.5 0 0 1 2.106-.873l.31-1.241zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' },
         { to: '/admin/suppliers',    label: t('nav.suppliers'),  icon: 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a3 3 0 0 1 5.356-1.857M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM23 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0z' },
+        { to: '/bank',               label: t('nav.bank'),       icon: 'M3 9l9-7 9 7m-2 0v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9m4 11V13h4v7' },
         { to: '/admin/codebooks',    label: t('nav.codebooks'),  icon: 'M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10' },
         { to: '/recurring',          label: t('nav.recurring'),  icon: 'M4 4v5h5M4 9a8 8 0 0 1 14.13-4.06M20 20v-5h-5M20 15a8 8 0 0 1-14.13 4.06' },
         { to: '/admin/export',       label: t('nav.exports'),    icon: 'M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' },
@@ -71,7 +72,8 @@ const navItems = computed<NavItem[]>(() => {
 
 function isActive(to: string) {
   if (to === '/') return route.path === '/'
-  if (to === '/admin') return route.path.startsWith('/admin')
+  // Systém top-level zahrnuje i Banku (přesunutá do admin submenu).
+  if (to === '/admin') return route.path.startsWith('/admin') || route.path.startsWith('/bank')
   return route.path.startsWith(to)
 }
 

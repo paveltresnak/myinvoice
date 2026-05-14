@@ -2,13 +2,11 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { projectsApi, type Project, type ProjectStats } from '@/api/projects'
+import { projectsApi, type Project } from '@/api/projects'
 import { clientsApi, type Client } from '@/api/clients'
 import TableSkeleton from '@/components/ui/TableSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SearchableSelect from '@/components/ui/SearchableSelect.vue'
-import TopProjectsBarChart from '@/components/charts/TopProjectsBarChart.vue'
-import ProjectStatusChart from '@/components/charts/ProjectStatusChart.vue'
 import { formatMoney, formatDate } from '@/composables/useFormat'
 
 const { t } = useI18n()
@@ -59,50 +57,10 @@ async function loadClients() {
   clients.value = r.data
 }
 
-const stats = ref<ProjectStats | null>(null)
-async function loadStats() {
-  try { stats.value = await projectsApi.stats() } catch { /* tichý fallback */ }
-}
-
-import { computed } from 'vue'
-
-const statusCounts = computed<Record<string, number>>(() => {
-  const m: Record<string, number> = {}
-  for (const r of stats.value?.status_breakdown ?? []) m[r.status] = r.count
-  return m
-})
-
-function topChart(year: 'this' | 'prev') {
-  const block = year === 'this' ? stats.value?.top_this_year : stats.value?.top_prev_year
-  if (!block) return { labels: [], values: [], greyed: [] as number[] }
-  const labels = block.top.map(p => `${p.name} — ${p.client_company_name}`)
-  const values = block.top.map(p => p.revenue)
-  const greyed: number[] = []
-  if (block.others.count > 0) {
-    labels.push(t('project.others_label', { n: block.others.count }))
-    values.push(block.others.revenue)
-    greyed.push(values.length - 1)
-  }
-  return { labels, values, greyed }
-}
-
-const totalThisYear = computed(() =>
-  (stats.value?.totals_per_year ?? []).filter(r => r.year === stats.value?.this_year)
-)
-const totalPrevYear = computed(() =>
-  (stats.value?.totals_per_year ?? []).filter(r => r.year === stats.value?.prev_year)
-)
-
-// Status chart spans 2 sloupce jen pokud jsou všechny 3 charty viditelné (lichý počet → status alone v row 2).
-// Při 2 chartech (např. top_this + status) → každý 1 sloupec, side-by-side.
-const statusFullWidth = computed(() =>
-  !!(stats.value?.top_this_year.top.length && stats.value?.top_prev_year.top.length)
-)
-
 onMounted(async () => {
   // Pre-fill from query
   if (route.query.client_id) clientId.value = Number(route.query.client_id)
-  await Promise.all([loadClients(), loadStats(), load(true)])
+  await Promise.all([loadClients(), load(true)])
 })
 
 function emailsFor(p: Project): string {
@@ -242,64 +200,6 @@ watch([status, clientId, sort], () => load(true))
           {{ loadingMore ? t('common.loading_more') : t('common.load_more') }}
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
         </button>
-      </div>
-    </div>
-
-    <!-- Statistiky — top zakázek + status (pod tabulkou) -->
-    <div v-if="stats" class="mt-6 space-y-4">
-      <!-- KPI tile řádek -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">{{ t('project.stats_total_year', { year: stats.this_year }) }}</h3>
-          <div v-if="totalThisYear.length" class="space-y-0.5">
-            <div v-for="r in totalThisYear" :key="`t-${r.currency}`" class="flex items-baseline justify-between">
-              <span class="text-2xl font-semibold font-mono text-neutral-900">{{ formatMoney(r.total, r.currency) }}</span>
-              <span class="text-xs text-neutral-500 ml-3">{{ r.invoice_count }} ks</span>
-            </div>
-          </div>
-          <div v-else class="text-neutral-400 text-sm">—</div>
-        </div>
-        <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-2">{{ t('project.stats_total_year', { year: stats.prev_year }) }}</h3>
-          <div v-if="totalPrevYear.length" class="space-y-0.5">
-            <div v-for="r in totalPrevYear" :key="`p-${r.currency}`" class="flex items-baseline justify-between">
-              <span class="text-2xl font-semibold font-mono text-neutral-700">{{ formatMoney(r.total, r.currency) }}</span>
-              <span class="text-xs text-neutral-500 ml-3">{{ r.invoice_count }} ks</span>
-            </div>
-          </div>
-          <div v-else class="text-neutral-400 text-sm">—</div>
-        </div>
-      </div>
-
-      <!-- Top zakázek + status — layout dle počtu visible chartů -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div v-if="stats.top_this_year.top.length" class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <div class="flex items-baseline justify-between mb-3">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500">{{ t('project.stats_top_this_year', { year: stats.this_year }) }}</h3>
-            <span class="text-xs font-mono text-neutral-500">{{ stats.primary_currency }}</span>
-          </div>
-          <TopProjectsBarChart
-            :labels="topChart('this').labels"
-            :values="topChart('this').values"
-            :greyed-indexes="topChart('this').greyed"
-            :currency="stats.primary_currency" />
-        </div>
-        <div v-if="stats.top_prev_year.top.length" class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
-          <div class="flex items-baseline justify-between mb-3">
-            <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500">{{ t('project.stats_top_prev_year', { year: stats.prev_year }) }}</h3>
-            <span class="text-xs font-mono text-neutral-500">{{ stats.primary_currency }}</span>
-          </div>
-          <TopProjectsBarChart
-            :labels="topChart('prev').labels"
-            :values="topChart('prev').values"
-            :greyed-indexes="topChart('prev').greyed"
-            :currency="stats.primary_currency" />
-        </div>
-        <div v-if="stats.status_breakdown.length"
-          :class="['bg-white border border-neutral-200 rounded-lg p-5 shadow-sm', statusFullWidth ? 'md:col-span-2' : '']">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-3">{{ t('project.stats_status_breakdown') }}</h3>
-          <ProjectStatusChart :counts="statusCounts" />
-        </div>
       </div>
     </div>
   </div>

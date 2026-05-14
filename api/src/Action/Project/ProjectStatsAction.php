@@ -27,6 +27,10 @@ final class ProjectStatsAction
         $thisYear = (int) date('Y');
         $prevYear = $thisYear - 1;
         $sid = (int) $request->getAttribute(SupplierScopeMiddleware::ATTR_CURRENT_ID, 0);
+        $stmt = $pdo->prepare('SELECT is_vat_payer FROM supplier WHERE id = ?');
+        $stmt->execute([$sid]);
+        $isVatPayer = (bool) $stmt->fetchColumn();
+        $rev = $isVatPayer ? 'i.total_without_vat' : 'i.total_with_vat';
 
         // Primární měna — nejvyužívanější ve fakturách (proti zaplnění grafů různými měnami)
         $stmt = $pdo->prepare(
@@ -46,10 +50,12 @@ final class ProjectStatsAction
             'this_year'        => $thisYear,
             'prev_year'        => $prevYear,
             'primary_currency' => $primaryCurrency,
-            'top_this_year'    => $this->topProjects($pdo, $thisYear, $primaryCurrency, $sid),
-            'top_prev_year'    => $this->topProjects($pdo, $prevYear, $primaryCurrency, $sid),
-            'totals_per_year'  => $this->totalsPerYear($pdo, [$thisYear, $prevYear], $sid),
+            'top_this_year'    => $this->topProjects($pdo, $thisYear, $primaryCurrency, $sid, $rev),
+            'top_prev_year'    => $this->topProjects($pdo, $prevYear, $primaryCurrency, $sid, $rev),
+            'top_12m'          => $this->topProjects12m($pdo, $primaryCurrency, $sid, $rev),
+            'totals_per_year'  => $this->totalsPerYear($pdo, [$thisYear, $prevYear], $sid, $rev),
             'status_breakdown' => $this->statusBreakdown($pdo, $sid),
+            'is_vat_payer'     => $isVatPayer,
         ]);
     }
 
@@ -57,12 +63,12 @@ final class ProjectStatsAction
      * Top 10 zakázek dle obratu v daném roce a měně + souhrn "Ostatní".
      * @return array{top: list<array<string,mixed>>, others: array{revenue: float, count: int}}
      */
-    private function topProjects(\PDO $pdo, int $year, string $currency, int $sid): array
+    private function topProjects(\PDO $pdo, int $year, string $currency, int $sid, string $rev): array
     {
         $stmt = $pdo->prepare(
             "SELECT p.id, p.name,
                     c.company_name AS client_company_name,
-                    SUM(i.total_with_vat) AS revenue,
+                    SUM($rev) AS revenue,
                     COUNT(i.id) AS invoice_count
                FROM invoices i
                JOIN projects p ON p.id = i.project_id
@@ -80,8 +86,8 @@ final class ProjectStatsAction
         $stmt->execute([$sid, $currency, $year]);
         $all = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $top = array_slice($all, 0, 10);
-        $rest = array_slice($all, 10);
+        $top = array_slice($all, 0, 12);
+        $rest = array_slice($all, 12);
 
         $top = array_map(fn (array $r) => [
             'id'                  => (int) $r['id'],
@@ -101,14 +107,57 @@ final class ProjectStatsAction
         return ['top' => $top, 'others' => $others];
     }
 
+    /**
+     * Top zakázky za posledních 12 měsíců (rolling) — stabilní vůči začátku roku.
+     */
+    private function topProjects12m(\PDO $pdo, string $currency, int $sid, string $rev): array
+    {
+        $stmt = $pdo->prepare(
+            "SELECT p.id, p.name,
+                    c.company_name AS client_company_name,
+                    SUM($rev) AS revenue,
+                    COUNT(i.id) AS invoice_count
+               FROM invoices i
+               JOIN projects p ON p.id = i.project_id
+               JOIN clients  c ON c.id = p.client_id
+               JOIN currencies cur ON cur.id = i.currency_id
+              WHERE i.supplier_id = ?
+                AND i.status IN ('issued', 'sent', 'reminded', 'paid')
+                AND i.invoice_type IN ('invoice', 'credit_note')
+                AND cur.code = ?
+                AND COALESCE(i.tax_date, i.issue_date) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+           GROUP BY p.id, p.name, c.company_name
+             HAVING revenue > 0
+           ORDER BY revenue DESC"
+        );
+        $stmt->execute([$sid, $currency]);
+        $all = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $top = array_slice($all, 0, 12);
+        $rest = array_slice($all, 12);
+        $top = array_map(static fn (array $r) => [
+            'id'                  => (int) $r['id'],
+            'name'                => $r['name'],
+            'client_company_name' => $r['client_company_name'],
+            'revenue'             => (float) $r['revenue'],
+            'invoice_count'       => (int) $r['invoice_count'],
+        ], $top);
+        $others = ['revenue' => 0.0, 'count' => 0];
+        foreach ($rest as $r) {
+            $others['revenue'] += (float) $r['revenue'];
+            $others['count']++;
+        }
+        $others['revenue'] = round($others['revenue'], 2);
+        return ['top' => $top, 'others' => $others];
+    }
+
     /** @param int[] $years */
-    private function totalsPerYear(\PDO $pdo, array $years, int $sid): array
+    private function totalsPerYear(\PDO $pdo, array $years, int $sid, string $rev): array
     {
         $place = implode(',', array_fill(0, count($years), '?'));
         $stmt = $pdo->prepare(
             "SELECT YEAR(COALESCE(i.tax_date, i.issue_date)) AS year,
                     cur.code AS currency,
-                    SUM(i.total_with_vat) AS total,
+                    SUM($rev) AS total,
                     COUNT(*) AS invoice_count
                FROM invoices i
                JOIN currencies cur ON cur.id = i.currency_id

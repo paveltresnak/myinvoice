@@ -39,11 +39,13 @@ final class StatsRecomputer
             $stmt = $pdo->prepare(
                 "SELECT i.currency_id,
                         SUM(CASE WHEN i.invoice_type IN ('invoice', 'credit_note')
-                                  THEN i.total_with_vat ELSE 0 END) AS revenue,
+                                  THEN CASE WHEN s.is_vat_payer = 1 THEN i.total_without_vat ELSE i.total_with_vat END
+                                  ELSE 0 END) AS revenue,
                         SUM(CASE WHEN i.invoice_type IN ('invoice', 'credit_note')
                                   THEN 1 ELSE 0 END) AS cnt,
                         MAX(COALESCE(i.tax_date, i.issue_date)) AS last_date
                    FROM invoices i
+                   JOIN supplier s ON s.id = i.supplier_id
                   WHERE i.project_id = ?
                     AND i.status IN ('issued', 'sent', 'reminded', 'paid')
                     AND i.invoice_type != 'cancellation'
@@ -88,11 +90,13 @@ final class StatsRecomputer
             $stmt = $pdo->prepare(
                 "SELECT i.currency_id,
                         SUM(CASE WHEN i.invoice_type IN ('invoice', 'credit_note')
-                                  THEN i.total_with_vat ELSE 0 END) AS revenue,
+                                  THEN CASE WHEN s.is_vat_payer = 1 THEN i.total_without_vat ELSE i.total_with_vat END
+                                  ELSE 0 END) AS revenue,
                         SUM(CASE WHEN i.invoice_type IN ('invoice', 'credit_note')
                                   THEN 1 ELSE 0 END) AS cnt,
                         MAX(COALESCE(i.tax_date, i.issue_date)) AS last_date
                    FROM invoices i
+                   JOIN supplier s ON s.id = i.supplier_id
                   WHERE i.client_id = ?
                     AND i.status IN ('issued', 'sent', 'reminded', 'paid')
                     AND i.invoice_type != 'cancellation'
