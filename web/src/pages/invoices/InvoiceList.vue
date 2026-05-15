@@ -88,6 +88,15 @@ const sendableSelected = computed(() => {
     )
 })
 
+// Hromadné vystavení — jen drafty. Řadíme podle issue_date asc, pak id asc, aby varsymboly šly sekvenčně.
+const issuableSelected = computed(() => {
+  const ids = new Set(selectedIds.value)
+  return groups.value
+    .flatMap(g => g.invoices)
+    .filter(inv => ids.has(inv.id) && inv.status === 'draft')
+    .sort((a, b) => (a.issue_date || '').localeCompare(b.issue_date || '') || (a.id - b.id))
+})
+
 // Hromadné označení za zaplacené — jen issued/sent/reminded (ne paid, ne cancelled, ne draft, ne cancellation)
 const markPayableSelected = computed(() => {
   const ids = new Set(selectedIds.value)
@@ -170,6 +179,37 @@ async function bulkMarkPaid() {
       toast.warning(t('invoice.bulk_mark_paid_partial', { ok: okCount, err: errors.length }) + '\n' + errors.join('\n'))
     } else {
       toast.success(t('invoice.bulk_mark_paid_success', { n: okCount }))
+    }
+    await load()
+  } finally {
+    bulkBusy.value = false
+  }
+}
+
+async function bulkIssue() {
+  const list = issuableSelected.value
+  if (list.length === 0) {
+    toast.warning(t('invoice.bulk_issue_no_eligible'))
+    return
+  }
+  if (!confirm(t('invoice.bulk_issue_confirm', { n: list.length }))) return
+  bulkBusy.value = true
+  let okCount = 0
+  const errors: string[] = []
+  try {
+    for (const inv of list) {
+      try {
+        await invoicesApi.issue(inv.id)
+        okCount++
+      } catch (e: any) {
+        errors.push(`#${inv.id}: ${e?.response?.data?.error?.message || 'chyba'}`)
+      }
+    }
+    selectedIds.value = []
+    if (errors.length) {
+      toast.warning(t('invoice.bulk_issue_partial', { ok: okCount, err: errors.length }) + '\n' + errors.join('\n'))
+    } else {
+      toast.success(t('invoice.bulk_issue_success', { n: okCount }))
     }
     await load()
   } finally {
@@ -342,6 +382,13 @@ const monthOptions = computed(() => (tm('common.months_short') as unknown as str
         <p class="text-sm text-neutral-500 mt-0.5">{{ t('invoice.subtitle_grouping') }}</p>
       </div>
       <div class="flex items-center gap-2">
+        <button v-if="issuableSelected.length > 0"
+          @click="bulkIssue"
+          :disabled="bulkBusy"
+          class="cursor-pointer inline-flex items-center gap-1.5 h-9 px-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-md">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          {{ bulkBusy ? '…' : t('invoice.bulk_issue', { n: issuableSelected.length }) }}
+        </button>
         <button v-if="selectedIds.length > 0"
           @click="bulkReissue"
           :disabled="bulkBusy"

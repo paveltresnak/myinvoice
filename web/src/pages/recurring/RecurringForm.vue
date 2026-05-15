@@ -171,6 +171,17 @@ watch(() => form.value.client_id, async (newId) => {
   }
 })
 
+// Po výběru zakázky převzít její splatnost. Až po prvotním načtení formuláře,
+// aby se v edit módu nepřepsala uložená hodnota při hydrataci.
+watch(() => form.value.project_id, (newId) => {
+  if (!formLoaded.value) return
+  if (!newId) return
+  const p = projects.value.find(x => x.id === newId)
+  if (p && typeof p.payment_due_days === 'number') {
+    form.value.payment_due_days = p.payment_due_days
+  }
+})
+
 // Inline create modaly — žádné opouštění editoru pravidelné fakturace.
 const clientModalOpen = ref(false)
 const projectModalOpen = ref(false)
@@ -185,6 +196,9 @@ async function onClientCreatedInModal(client: Client) {
 async function onProjectCreatedInModal(project: Project) {
   projects.value = [project, ...projects.value.filter(p => p.id !== project.id)]
   form.value.project_id = project.id
+  if (typeof project.payment_due_days === 'number') {
+    form.value.payment_due_days = project.payment_due_days
+  }
   projectModalOpen.value = false
 }
 
