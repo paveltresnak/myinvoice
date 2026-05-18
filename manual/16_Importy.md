@@ -94,9 +94,22 @@ ISDOC přílohu". V tom případě:
   ISDOC PDF spec).
 - ✅ PDF s embedded ISDOC pod jiným jménem (content sniff podle ISDOC
   namespace `http://isdoc.cz/namespace/2013`).
-- ❌ PDF s objekty v `compressed object streams` (`/Type /ObjStm`). Tohle
-  používá malá část producentů (např. starší TCPDF s aggressive optimization).
-  Pokud na takový soubor narazíš, vytáhni si ISDOC v původním systému ručně.
+- ✅ PDF s *compressed object streams* (`/Type /ObjStm`, PDF 1.5+).
+  Spec sice ObjStm zavedlo, ale **stream objekty (a tím i `EmbeddedFile`)
+  v ObjStm být nesmí** — vždy zůstávají na top-level, takže náš scanner
+  je najde i v takových PDF.
+
+**Limity:**
+
+- ❌ **Šifrované PDF** (heslem nebo certifikátem). Stream byty jsou
+  zašifrované, extractor je neumí dekódovat. Otevři PDF v Adobe Readeru,
+  zadej heslo, ulož znovu bez šifrování, a pak nahraj.
+- ❌ **Non-FlateDecode stream filtr** (LZW, RunLengthDecode, ASCII85
+  bez následného Flate). Extractor zvládá jen FlateDecode (drtivá
+  většina dnešních PDF). U starších/legacy producentů můžeš narazit.
+- ❌ **Vícestupňový filter chain** (`/Filter [/ASCII85Decode /FlateDecode]`).
+  Vzácné, ale existuje. Workaround: stáhni si ISDOC samostatně v původním
+  systému.
 
 ## 16.7 Tipy
 
