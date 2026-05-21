@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   purchaseInvoicesApi,
@@ -18,6 +18,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 
 useHotkey('ctrl+n', (e) => { e.preventDefault(); router.push('/purchase-invoices/new') })
@@ -45,7 +46,20 @@ const bulkBusy = ref(false)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-onMounted(load)
+onMounted(() => {
+  // Pre-fill filters from URL query (e.g. /purchase-invoices?overdue=1 from CRM action items)
+  const q = route.query
+  if (q.overdue === '1' || q.overdue === 'true') {
+    overdueOnly.value = true
+    yearFilter.value = ''
+  }
+  if (q.unpaid === '1' || q.unpaid === 'true') {
+    unpaidOnly.value = true
+    yearFilter.value = ''
+  }
+  if (typeof q.status === 'string') statusFilter.value = q.status as PurchaseInvoiceStatus
+  load()
+})
 watch([statusFilter, kindFilter, yearFilter, monthFilter, dateFrom, dateTo,
        overdueOnly, unpaidOnly, currencyFilter], () => load())
 watch(search, () => {

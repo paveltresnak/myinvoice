@@ -1634,7 +1634,19 @@
     "title": "CRM dashboard",
     "subtitle": "Tržby, náklady, zisk, top klienti a vendoři.",
     "action_items": {
-      "title": "Akce pro tebe"
+      "title": "Akce pro tebe",
+      "go_to": "Přejít na detail",
+      "dismiss": "Skrýt upozornění",
+      "dismiss_title": "Skrýt na",
+      "dismiss_day": "Den",
+      "dismiss_day_hint": "Zobrazit znovu zítra",
+      "dismiss_week": "Týden",
+      "dismiss_week_hint": "Zobrazit znovu za 7 dní",
+      "dismiss_historical": "Pro historická data",
+      "dismiss_historical_hint": "Zobrazit jen nové výskyty (skrýt současné)",
+      "dismiss_forever": "Navždy",
+      "dismiss_forever_hint": "Nikdy znovu nezobrazovat",
+      "dismissed": "Upozornění bylo skryto"
     },
     "cash_flow": {
       "title": "Cash flow prognóza",

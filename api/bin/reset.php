@@ -113,6 +113,7 @@ $wipe = [
     'ai_extractions',                // AI extract history (jen pokud table existuje)
     // CRM aggregate cache
     'crm_monthly_summary',           // pre-aggregated stats (fáze 5)
+    'crm_action_item_dismissals',    // per-user dismissals "Akce pro tebe" (migrace 0040)
     'project_revenue_cache',
     'client_revenue_cache',
     // Tax submission archive (fáze 6 — archivované EPO XML)

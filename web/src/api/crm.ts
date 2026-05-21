@@ -121,6 +121,10 @@ export const crmApi = {
   // ─── Tier 1 (action + predictive) ───────────────────────────────────
   actionItems: () =>
     api.get<ActionItemsResult>('/crm/action-items').then(r => r.data),
+  dismissActionItem: (itemType: string, mode: 'day' | 'week' | 'forever' | 'historical') =>
+    api.post<{ ok: boolean }>('/crm/action-items/dismiss', { item_type: itemType, mode }).then(r => r.data),
+  restoreActionItem: (itemType: string) =>
+    api.post<{ ok: boolean }>('/crm/action-items/restore', { item_type: itemType }).then(r => r.data),
   cashFlowForecast: (weeks = 4, currency = 'CZK') =>
     api.get<CashFlowResult>('/crm/cash-flow-forecast', { params: { weeks, currency } }).then(r => r.data),
   lateRisk: (limit = 10) =>

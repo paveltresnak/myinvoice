@@ -133,7 +133,44 @@ final class CrmDashboardAction
     public function actionItems(Request $request, Response $response): Response
     {
         $supplierId = SupplierGuard::currentId($request);
-        return Json::ok($response, $this->crm->actionItems($supplierId));
+        $user = (array) $request->getAttribute(AuthMiddleware::ATTR_USER, []);
+        $userId = isset($user['id']) ? (int) $user['id'] : null;
+        return Json::ok($response, $this->crm->actionItems($supplierId, $userId));
+    }
+
+    /** Dismiss action item (day / week / forever / historical). */
+    public function dismissActionItem(Request $request, Response $response): Response
+    {
+        $supplierId = SupplierGuard::currentId($request);
+        $user = (array) $request->getAttribute(AuthMiddleware::ATTR_USER, []);
+        $userId = isset($user['id']) ? (int) $user['id'] : 0;
+        if ($userId <= 0) {
+            return Json::error($response, 'unauthorized', 'Unauthorized.', 401);
+        }
+        $body = (array) $request->getParsedBody();
+        $itemType = (string) ($body['item_type'] ?? '');
+        $mode = (string) ($body['mode'] ?? '');
+        try {
+            $this->crm->dismissActionItem($supplierId, $userId, $itemType, $mode);
+        } catch (\InvalidArgumentException $e) {
+            return Json::error($response, 'invalid_input', $e->getMessage(), 400);
+        }
+        return Json::ok($response, ['ok' => true]);
+    }
+
+    /** Restore (un-dismiss) action item. */
+    public function restoreActionItem(Request $request, Response $response): Response
+    {
+        $supplierId = SupplierGuard::currentId($request);
+        $user = (array) $request->getAttribute(AuthMiddleware::ATTR_USER, []);
+        $userId = isset($user['id']) ? (int) $user['id'] : 0;
+        if ($userId <= 0) {
+            return Json::error($response, 'unauthorized', 'Unauthorized.', 401);
+        }
+        $body = (array) $request->getParsedBody();
+        $itemType = (string) ($body['item_type'] ?? '');
+        $this->crm->restoreActionItem($supplierId, $userId, $itemType);
+        return Json::ok($response, ['ok' => true]);
     }
 
     /** Cash flow forecast 4 týdny dopředu. */

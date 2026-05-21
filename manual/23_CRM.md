@@ -1,4 +1,4 @@
-# CRM dashboard
+# 23. CRM dashboard
 
 CRM (Customer Relationship Management) v MyInvoice.cz je BI/analytický modul nad tržbami, náklady a klienty. Najdeš ho v menu **Finance → CRM**.
 

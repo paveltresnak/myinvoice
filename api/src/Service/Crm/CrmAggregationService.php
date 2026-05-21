@@ -511,27 +511,35 @@ final class CrmAggregationService
     /**
      * Action items widget — daily TODO list pro user.
      *
+     * Pokud je předán $userId, aplikuje per-user dismissals (day/week/forever/historical).
+     * Pro mode=historical: vrátí item jen pokud existuje NOVÉ id, které není v baseline.
+     *
      * @return array{
      *   items: list<array{type:string, severity:string, title:string, hint:string, link:string, count?:int, days?:int}>,
      *   total: int
      * }
      */
-    public function actionItems(int $supplierId): array
+    public function actionItems(int $supplierId, ?int $userId = null): array
     {
         $items = [];
         $pdo = $this->db->pdo();
         $today = (new \DateTimeImmutable())->format('Y-m-d');
 
+        // Load dismissals once
+        $dismissals = $this->loadDismissals($supplierId, $userId);
+
         // 1. Overdue vystavené faktury — pošli upomínku
         $stmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM invoices
+            "SELECT id FROM invoices
               WHERE supplier_id = ?
                 AND status IN ('issued', 'sent', 'reminded')
                 AND invoice_type != 'proforma'
                 AND due_date < ?"
         );
         $stmt->execute([$supplierId, $today]);
-        $overdueCount = (int) $stmt->fetchColumn();
+        $overdueIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $overdueIds = $this->filterByDismissal($overdueIds, $dismissals, 'overdue_invoices');
+        $overdueCount = count($overdueIds);
         if ($overdueCount > 0) {
             $items[] = [
                 'type'     => 'overdue_invoices',
@@ -546,7 +554,7 @@ final class CrmAggregationService
 
         // 2. Recurring s next_run_date v <= 3 dnech (nové faktury k vystavení)
         $stmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM recurring_invoice_templates
+            "SELECT id FROM recurring_invoice_templates
               WHERE supplier_id = ?
                 AND (end_date IS NULL OR end_date >= ?)
                 AND next_run_date IS NOT NULL
@@ -554,7 +562,9 @@ final class CrmAggregationService
                 AND next_run_date >= ?"
         );
         $stmt->execute([$supplierId, $today, $today, $today]);
-        $recurringCount = (int) $stmt->fetchColumn();
+        $recurringIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $recurringIds = $this->filterByDismissal($recurringIds, $dismissals, 'recurring_due');
+        $recurringCount = count($recurringIds);
         if ($recurringCount > 0) {
             $items[] = [
                 'type'     => 'recurring_due',
@@ -569,13 +579,15 @@ final class CrmAggregationService
 
         // 3. Přijaté faktury po splatnosti — zaplatit dodavateli
         $stmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM purchase_invoices
+            "SELECT id FROM purchase_invoices
               WHERE supplier_id = ?
                 AND status IN ('received', 'booked')
                 AND due_date < ?"
         );
         $stmt->execute([$supplierId, $today]);
-        $payablesCount = (int) $stmt->fetchColumn();
+        $payablesIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $payablesIds = $this->filterByDismissal($payablesIds, $dismissals, 'overdue_payables');
+        $payablesCount = count($payablesIds);
         if ($payablesCount > 0) {
             $items[] = [
                 'type'     => 'overdue_payables',
@@ -589,37 +601,37 @@ final class CrmAggregationService
         }
 
         // 4. Reports deadlines — DPH/KH/SH se podávají 25. následujícího měsíce
-        $now = new \DateTimeImmutable($today);
-        $currentMonth = (int) $now->format('n');
-        $currentYear = (int) $now->format('Y');
-        $deadlineDate = $currentMonth === 1
-            ? "{$currentYear}-01-25" // for prev year December (taken across new year)
-            : sprintf('%04d-%02d-25', $currentYear, $currentMonth);
-        $deadlineDt = new \DateTimeImmutable($deadlineDate);
-        $daysToDeadline = (int) $now->diff($deadlineDt)->format('%r%a');
-        // Jen pokud jsme plátci DPH (mají vyplněné is_vat_payer + financial_office_code)
-        $stmt = $pdo->prepare(
-            "SELECT is_vat_payer FROM supplier WHERE id = ?"
-        );
-        $stmt->execute([$supplierId]);
-        $isVatPayer = (bool) $stmt->fetchColumn();
-        if ($isVatPayer && $daysToDeadline >= -3 && $daysToDeadline <= 7) {
-            $sev = $daysToDeadline < 0 ? 'high' : ($daysToDeadline <= 2 ? 'high' : 'medium');
-            $items[] = [
-                'type'     => 'tax_deadline',
-                'severity' => $sev,
-                'title'    => 'DPH + KH za uplynulý měsíc',
-                'hint'     => $daysToDeadline < 0
-                    ? sprintf('Termín byl %d dní zpět — podej co nejdříve!', abs($daysToDeadline))
-                    : sprintf('Termín podání za %d %s (do %s)', $daysToDeadline,
-                        $daysToDeadline === 1 ? 'den' : ($daysToDeadline < 5 ? 'dny' : 'dní'),
-                        $deadlineDate),
-                'link'     => '/reports/dph',
-                'days'     => $daysToDeadline,
-            ];
+        // (date-based, historical mode chová se jako forever na aktuální měsíc)
+        if (!$this->isFullyDismissed($dismissals, 'tax_deadline')) {
+            $now = new \DateTimeImmutable($today);
+            $currentMonth = (int) $now->format('n');
+            $currentYear = (int) $now->format('Y');
+            $deadlineDate = $currentMonth === 1
+                ? "{$currentYear}-01-25"
+                : sprintf('%04d-%02d-25', $currentYear, $currentMonth);
+            $deadlineDt = new \DateTimeImmutable($deadlineDate);
+            $daysToDeadline = (int) $now->diff($deadlineDt)->format('%r%a');
+            $stmt = $pdo->prepare("SELECT is_vat_payer FROM supplier WHERE id = ?");
+            $stmt->execute([$supplierId]);
+            $isVatPayer = (bool) $stmt->fetchColumn();
+            if ($isVatPayer && $daysToDeadline >= -3 && $daysToDeadline <= 7) {
+                $sev = $daysToDeadline < 0 ? 'high' : ($daysToDeadline <= 2 ? 'high' : 'medium');
+                $items[] = [
+                    'type'     => 'tax_deadline',
+                    'severity' => $sev,
+                    'title'    => 'DPH + KH za uplynulý měsíc',
+                    'hint'     => $daysToDeadline < 0
+                        ? sprintf('Termín byl %d dní zpět — podej co nejdříve!', abs($daysToDeadline))
+                        : sprintf('Termín podání za %d %s (do %s)', $daysToDeadline,
+                            $daysToDeadline === 1 ? 'den' : ($daysToDeadline < 5 ? 'dny' : 'dní'),
+                            $deadlineDate),
+                    'link'     => '/reports/dph',
+                    'days'     => $daysToDeadline,
+                ];
+            }
         }
 
-        // 5. Klienti dlouho bez objednávky (90+ dní) — top 3
+        // 5. Klienti dlouho bez objednávky (90+ dní)
         $stmt = $pdo->prepare(
             "WITH last_invoice AS (
                 SELECT client_id, MAX(issue_date) AS last_date
@@ -628,12 +640,14 @@ final class CrmAggregationService
                    AND status NOT IN ('draft', 'cancelled')
                  GROUP BY client_id
               )
-              SELECT COUNT(*) AS cnt FROM last_invoice li
+              SELECT li.client_id FROM last_invoice li
               JOIN clients c ON c.id = li.client_id
              WHERE DATEDIFF(?, li.last_date) >= 90"
         );
         $stmt->execute([$supplierId, $today]);
-        $churnCount = (int) $stmt->fetchColumn();
+        $churnIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+        $churnIds = $this->filterByDismissal($churnIds, $dismissals, 'churn_risk');
+        $churnCount = count($churnIds);
         if ($churnCount > 0) {
             $items[] = [
                 'type'     => 'churn_risk',
@@ -647,6 +661,222 @@ final class CrmAggregationService
         }
 
         return ['items' => $items, 'total' => count($items)];
+    }
+
+    /**
+     * Vrátí dismissals pro daného user (klíčované item_type).
+     * Auto-promaže expirované záznamy day/week.
+     *
+     * @return array<string, array{mode:string, dismissed_until:?string, baseline_ids:?array<int>}>
+     */
+    private function loadDismissals(int $supplierId, ?int $userId): array
+    {
+        if ($userId === null || $userId <= 0) {
+            return [];
+        }
+        $pdo = $this->db->pdo();
+        // Auto-cleanup expired temporary dismissals
+        $cleanup = $pdo->prepare(
+            "DELETE FROM crm_action_item_dismissals
+              WHERE supplier_id = ? AND user_id = ?
+                AND mode IN ('day','week')
+                AND dismissed_until IS NOT NULL
+                AND dismissed_until < NOW()"
+        );
+        $cleanup->execute([$supplierId, $userId]);
+
+        $stmt = $pdo->prepare(
+            "SELECT item_type, mode, dismissed_until, baseline_ids
+               FROM crm_action_item_dismissals
+              WHERE supplier_id = ? AND user_id = ?"
+        );
+        $stmt->execute([$supplierId, $userId]);
+        $out = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+            $baseline = null;
+            if ($row['baseline_ids'] !== null) {
+                $decoded = json_decode((string) $row['baseline_ids'], true);
+                $baseline = is_array($decoded) ? array_map('intval', $decoded) : null;
+            }
+            $out[(string) $row['item_type']] = [
+                'mode'            => (string) $row['mode'],
+                'dismissed_until' => $row['dismissed_until'] !== null ? (string) $row['dismissed_until'] : null,
+                'baseline_ids'    => $baseline,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Vrací jen ID, která mají být zobrazená.
+     * - day/week: pokud dismissed_until je v budoucnosti → []
+     * - forever: → []
+     * - historical: vrátí ID, která NEJSOU v baseline (= "nová")
+     *
+     * @param list<int> $currentIds
+     * @param array<string, array{mode:string, dismissed_until:?string, baseline_ids:?array<int>}> $dismissals
+     * @return list<int>
+     */
+    private function filterByDismissal(array $currentIds, array $dismissals, string $itemType): array
+    {
+        if (!isset($dismissals[$itemType])) {
+            return $currentIds;
+        }
+        $d = $dismissals[$itemType];
+        $mode = $d['mode'];
+        if ($mode === 'day' || $mode === 'week') {
+            // dismissed_until v budoucnosti = hide; jinak by byl už vyčištěn loadDismissals
+            if ($d['dismissed_until'] !== null && strtotime($d['dismissed_until']) > time()) {
+                return [];
+            }
+            return $currentIds;
+        }
+        if ($mode === 'forever') {
+            return [];
+        }
+        if ($mode === 'historical') {
+            $baseline = $d['baseline_ids'] ?? [];
+            $baselineSet = array_flip($baseline);
+            return array_values(array_filter($currentIds, static fn(int $id) => !isset($baselineSet[$id])));
+        }
+        return $currentIds;
+    }
+
+    /**
+     * True pokud daný item type je plně skrytý (forever / historical bez baseline nebo s aktivním day/week).
+     */
+    private function isFullyDismissed(array $dismissals, string $itemType): bool
+    {
+        if (!isset($dismissals[$itemType])) {
+            return false;
+        }
+        $d = $dismissals[$itemType];
+        if ($d['mode'] === 'forever' || $d['mode'] === 'historical') {
+            return true;
+        }
+        if (($d['mode'] === 'day' || $d['mode'] === 'week')
+            && $d['dismissed_until'] !== null
+            && strtotime($d['dismissed_until']) > time()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Uloží dismissal pro user + item_type.
+     * Mode 'historical' → snapshotuje aktuální set ID daného typu.
+     * Mode 'day' / 'week' → spočítá dismissed_until.
+     * Mode 'forever' → dismissed_until = NULL.
+     */
+    public function dismissActionItem(int $supplierId, int $userId, string $itemType, string $mode): void
+    {
+        $validTypes = ['overdue_invoices', 'recurring_due', 'overdue_payables', 'tax_deadline', 'churn_risk'];
+        $validModes = ['day', 'week', 'forever', 'historical'];
+        if (!in_array($itemType, $validTypes, true)) {
+            throw new \InvalidArgumentException("Invalid item_type: {$itemType}");
+        }
+        if (!in_array($mode, $validModes, true)) {
+            throw new \InvalidArgumentException("Invalid mode: {$mode}");
+        }
+
+        $dismissedUntil = null;
+        if ($mode === 'day') {
+            $dismissedUntil = (new \DateTimeImmutable('+1 day'))->format('Y-m-d H:i:s');
+        } elseif ($mode === 'week') {
+            $dismissedUntil = (new \DateTimeImmutable('+7 days'))->format('Y-m-d H:i:s');
+        }
+
+        $baselineJson = null;
+        if ($mode === 'historical') {
+            $ids = $this->snapshotCurrentIds($supplierId, $itemType);
+            $baselineJson = json_encode($ids, JSON_THROW_ON_ERROR);
+        }
+
+        $pdo = $this->db->pdo();
+        $stmt = $pdo->prepare(
+            "INSERT INTO crm_action_item_dismissals
+                (supplier_id, user_id, item_type, mode, dismissed_until, baseline_ids)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                mode = VALUES(mode),
+                dismissed_until = VALUES(dismissed_until),
+                baseline_ids = VALUES(baseline_ids),
+                created_at = CURRENT_TIMESTAMP"
+        );
+        $stmt->execute([$supplierId, $userId, $itemType, $mode, $dismissedUntil, $baselineJson]);
+    }
+
+    /**
+     * Smaže dismissal pro user + item_type (restore notification).
+     */
+    public function restoreActionItem(int $supplierId, int $userId, string $itemType): void
+    {
+        $stmt = $this->db->pdo()->prepare(
+            "DELETE FROM crm_action_item_dismissals
+              WHERE supplier_id = ? AND user_id = ? AND item_type = ?"
+        );
+        $stmt->execute([$supplierId, $userId, $itemType]);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function snapshotCurrentIds(int $supplierId, string $itemType): array
+    {
+        $pdo = $this->db->pdo();
+        $today = (new \DateTimeImmutable())->format('Y-m-d');
+        switch ($itemType) {
+            case 'overdue_invoices':
+                $stmt = $pdo->prepare(
+                    "SELECT id FROM invoices
+                      WHERE supplier_id = ?
+                        AND status IN ('issued','sent','reminded')
+                        AND invoice_type != 'proforma'
+                        AND due_date < ?"
+                );
+                $stmt->execute([$supplierId, $today]);
+                break;
+            case 'recurring_due':
+                $stmt = $pdo->prepare(
+                    "SELECT id FROM recurring_invoice_templates
+                      WHERE supplier_id = ?
+                        AND (end_date IS NULL OR end_date >= ?)
+                        AND next_run_date IS NOT NULL
+                        AND next_run_date <= DATE_ADD(?, INTERVAL 3 DAY)
+                        AND next_run_date >= ?"
+                );
+                $stmt->execute([$supplierId, $today, $today, $today]);
+                break;
+            case 'overdue_payables':
+                $stmt = $pdo->prepare(
+                    "SELECT id FROM purchase_invoices
+                      WHERE supplier_id = ?
+                        AND status IN ('received','booked')
+                        AND due_date < ?"
+                );
+                $stmt->execute([$supplierId, $today]);
+                break;
+            case 'churn_risk':
+                $stmt = $pdo->prepare(
+                    "WITH last_invoice AS (
+                        SELECT client_id, MAX(issue_date) AS last_date
+                          FROM invoices
+                         WHERE supplier_id = ?
+                           AND status NOT IN ('draft','cancelled')
+                         GROUP BY client_id
+                      )
+                      SELECT li.client_id FROM last_invoice li
+                      JOIN clients c ON c.id = li.client_id
+                     WHERE DATEDIFF(?, li.last_date) >= 90"
+                );
+                $stmt->execute([$supplierId, $today]);
+                break;
+            case 'tax_deadline':
+                return []; // date-based, žádné ID
+            default:
+                return [];
+        }
+        return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
     }
 
     /**

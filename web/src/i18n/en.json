@@ -1634,7 +1634,19 @@
     "title": "CRM dashboard",
     "subtitle": "Revenue, costs, profit, top clients and vendors.",
     "action_items": {
-      "title": "Action items"
+      "title": "Action items",
+      "go_to": "Go to detail",
+      "dismiss": "Dismiss notification",
+      "dismiss_title": "Dismiss for",
+      "dismiss_day": "1 day",
+      "dismiss_day_hint": "Show again tomorrow",
+      "dismiss_week": "1 week",
+      "dismiss_week_hint": "Show again in 7 days",
+      "dismiss_historical": "Historical data",
+      "dismiss_historical_hint": "Show only new occurrences (hide current)",
+      "dismiss_forever": "Forever",
+      "dismiss_forever_hint": "Never show again",
+      "dismissed": "Notification dismissed"
     },
     "cash_flow": {
       "title": "Cash flow forecast",

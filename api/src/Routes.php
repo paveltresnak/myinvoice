@@ -318,6 +318,8 @@ final class Routes
         $app->get    ('/api/crm/expense-breakdown', [CrmDashboardAction::class, 'expenseBreakdown']);
         $app->get    ('/api/crm/churn-risk',        [CrmDashboardAction::class, 'churnRisk']);
         $app->get    ('/api/crm/action-items',      [CrmDashboardAction::class, 'actionItems']);
+        $app->post   ('/api/crm/action-items/dismiss', [CrmDashboardAction::class, 'dismissActionItem']);
+        $app->post   ('/api/crm/action-items/restore', [CrmDashboardAction::class, 'restoreActionItem']);
         $app->get    ('/api/crm/cash-flow-forecast', [CrmDashboardAction::class, 'cashFlowForecast']);
         $app->get    ('/api/crm/late-risk',         [CrmDashboardAction::class, 'lateRisk']);
         $app->get    ('/api/crm/reminder-effectiveness', [CrmDashboardAction::class, 'reminderEffectiveness']);
