@@ -1792,6 +1792,7 @@
       "extract_title": "Extract from PDF",
       "extract_hint": "ISDOC priority — if PDF has embed, use parser. Otherwise Claude vision. Synchronous (10-30s).",
       "drop_pdf": "Click or drop a PDF",
+      "only_pdf": "File must be a PDF.",
       "model_override": "Model for this request:",
       "use_default": "Default",
       "run_extract": "Extract + create draft",

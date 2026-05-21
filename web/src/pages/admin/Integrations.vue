@@ -285,6 +285,29 @@ function onAiPdfPick(e: Event) {
   aiResult.value = null
 }
 
+// Drag & drop handlers (browser default = open PDF in tab; preventDefault zastaví)
+const aiDragOver = ref(false)
+function onAiDragEnter(e: DragEvent) { e.preventDefault(); aiDragOver.value = true }
+function onAiDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+}
+function onAiDragLeave(e: DragEvent) {
+  if (e.target === e.currentTarget) aiDragOver.value = false
+}
+function onAiDrop(e: DragEvent) {
+  e.preventDefault()
+  aiDragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (!file) return
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    toast.error(t('integrations.ai.only_pdf'))
+    return
+  }
+  aiPdfFile.value = file
+  aiResult.value = null
+}
+
 async function runAiExtract() {
   if (!aiPdfFile.value || aiExtracting.value) return
   aiExtracting.value = true
@@ -714,7 +737,11 @@ onUnmounted(() => {
         <p class="text-xs text-neutral-500 mb-4">{{ t('integrations.ai.extract_hint') }}</p>
 
         <div class="space-y-3">
-          <label class="block border-2 border-dashed border-neutral-300 hover:border-primary-400 hover:bg-primary-50/30 rounded-lg p-6 text-center cursor-pointer transition">
+          <label class="block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
+            :class="aiDragOver
+              ? 'border-primary-500 bg-primary-50'
+              : 'border-neutral-300 hover:border-primary-400 hover:bg-primary-50/30'"
+            @dragenter="onAiDragEnter" @dragover="onAiDragOver" @dragleave="onAiDragLeave" @drop="onAiDrop">
             <input type="file" accept="application/pdf,.pdf" @change="onAiPdfPick" class="hidden" />
             <svg class="w-8 h-8 mx-auto text-neutral-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 0 1-.88-7.9 5 5 0 0 1 9.9-1A5.5 5.5 0 0 1 18.5 16H17m-5-4v9m0-9l-3 3m3-3l3 3" />

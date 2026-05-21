@@ -1792,6 +1792,7 @@
       "extract_title": "Extrahovat z PDF",
       "extract_hint": "ISDOC priorita — pokud PDF má embed, použijeme parser. Jinak Claude vision. Synchronní (10-30s).",
       "drop_pdf": "Klikni nebo přetáhni PDF",
+      "only_pdf": "Soubor musí být PDF.",
       "model_override": "Model pro tento request:",
       "use_default": "Výchozí",
       "run_extract": "Extrahovat + vytvořit draft",
