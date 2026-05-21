@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MyInvoice\Service\Import;
 
 use MyInvoice\Repository\PurchaseInvoiceRepository;
-use MyInvoice\Service\Cnb\CnbExchangeRateClient;
+use MyInvoice\Service\Currency\CnbExchangeRateClient;
 
 /**
  * Auto-apply ČNB kurzu na nově vytvořenou přijatou fakturu, pokud:
