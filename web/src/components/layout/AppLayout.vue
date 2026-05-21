@@ -94,6 +94,7 @@ const navSections = computed<NavSection[]>(() => {
       title: t('nav.section_purchase'),
       items: [
         { to: '/purchase-invoices',          label: t('nav.purchase_invoices'),  icon: ICONS.purchase },
+        { to: '/clients?role=vendors',       label: t('nav.vendors'),            icon: ICONS.suppliers },
         { to: '/purchase-invoices/export',   label: t('nav.purchase_export'),    icon: ICONS.exports },
         ...(isAdmin ? [{ to: '/admin/import?tab=purchase',  label: t('nav.imports_purchase'), icon: ICONS.imports }] : []),
         ...(isAdmin ? [{ to: '/admin/integrations?tab=ai',  label: t('nav.ai_import'),        icon: ICONS.ai }] : []),

@@ -58,7 +58,13 @@ final class Bootstrap
         }
         ini_set('log_errors', '1');
         ini_set('error_log', $logDir . '/php-errors.log');
-        ini_set('display_errors', $env === 'development' ? '1' : '0');
+        // NIKDY display_errors=on pro API endpoints — JSON response by byla kontaminována
+        // deprecation/notice warningy (typicky vendor 3rd-party kód). Logujeme do souboru.
+        // Dev env: warnings se objeví v log/php-errors.log + log/app-YYYY-MM-DD.log.
+        ini_set('display_errors', '0');
+        // Reporting: E_ALL minus E_DEPRECATED (PHP 8.5 deprecates older patterns ve vendoru,
+        // které nemůžeme fixnout — nechceme je v error log spamovat).
+        error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
         $builder = new ContainerBuilder();
         $builder->useAttributes(false);

@@ -75,38 +75,36 @@ final class SouhrnneHlaseniBuilder
         $shv->setAttribute('verzePis', '06.01');
         $pisemnost->appendChild($shv);
 
-        // VetaD — identifikace
+        // VetaD — typ podání + perioda (typ_platce/typ_ds jdou v VetaP per XSD).
         $vetaD = $dom->createElement('VetaD');
         $vetaD->setAttribute('k_uladis', 'DPH');
         $vetaD->setAttribute('rok', (string) $year);
         $vetaD->setAttribute('mesic', (string) $month);
-        if (!empty($supplier['financial_office_code'])) {
-            $vetaD->setAttribute('c_ufo', (string) $supplier['financial_office_code']);
-        }
-        if (!empty($supplier['workplace_code'])) {
-            $vetaD->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
-        }
-        $vetaD->setAttribute('typ_platce', $supplier['taxpayer_type'] === 'po' ? 'P' : 'F');
-        $vetaD->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'N');
+        $vetaD->setAttribute('shvies_forma', 'B'); // B = řádné
+        $vetaD->setAttribute('dokument', 'SHV');
         $shv->appendChild($vetaD);
 
         // VetaP — identifikace poplatníka
         $vetaP = $dom->createElement('VetaP');
-        if (!empty($supplier['dic'])) {
-            $vetaP->setAttribute('dic', (string) $supplier['dic']);
+        $vetaP->setAttribute('c_ufo', (string) ($supplier['financial_office_code'] ?: '451'));
+        if (!empty($supplier['workplace_code'])) {
+            $vetaP->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
         }
+        $dic = (string) ($supplier['dic'] ?? '');
+        $cleanDic = preg_replace('/^CZ/i', '', $dic) ?? $dic;
+        $cleanDic = preg_replace('/[^0-9]/', '', $cleanDic) ?? '';
+        $vetaP->setAttribute('dic', $cleanDic);
+        $vetaP->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'F');
         if ($supplier['taxpayer_type'] === 'po') {
-            $vetaP->setAttribute('typ_platce', 'P');
-            $vetaP->setAttribute('nazev_pol', (string) $supplier['company_name']);
+            $vetaP->setAttribute('zkrobchjm', (string) $supplier['company_name']);
         } else {
-            $vetaP->setAttribute('typ_platce', 'F');
             $parts = explode(' ', trim((string) $supplier['company_name']), 2);
             $vetaP->setAttribute('jmeno', $parts[0] ?? '');
             $vetaP->setAttribute('prijmeni', $parts[1] ?? $parts[0] ?? '');
         }
         $vetaP->setAttribute('ulice', (string) ($supplier['street'] ?? ''));
         $vetaP->setAttribute('naz_obce', (string) ($supplier['city'] ?? ''));
-        $vetaP->setAttribute('psc', (string) ($supplier['zip'] ?? ''));
+        $vetaP->setAttribute('psc', preg_replace('/\s/', '', (string) ($supplier['zip'] ?? '')) ?? '');
         $vetaP->setAttribute('stat', (string) ($supplier['country_iso2'] ?? 'CZ'));
         $shv->appendChild($vetaP);
 

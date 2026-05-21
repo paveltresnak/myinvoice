@@ -115,13 +115,16 @@ final class UploadPurchaseInvoicePdfAction
             return Json::error($response, 'invalid_pdf', 'Soubor není platný PDF dokument.', 400);
         }
 
-        // MIME sniffing
+        // MIME sniffing — PHP 8.5 deprecated finfo_close() (objects are GC'd automatically).
+        // Deprecation warning bohužel kontaminuje JSON response → response není validní JSON
+        // a frontend parsing fails. Proto finfo_close NEvoláme.
         $detectedMime = '';
         if (function_exists('finfo_open')) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             if ($finfo !== false) {
                 $detectedMime = (string) finfo_file($finfo, $tmpPath);
-                finfo_close($finfo);
+                // unset($finfo) — explicit GC, neemituje deprecation
+                unset($finfo);
             }
         }
         if ($detectedMime !== 'application/pdf') {

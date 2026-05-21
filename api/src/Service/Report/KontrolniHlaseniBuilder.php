@@ -73,52 +73,55 @@ final class KontrolniHlaseniBuilder
         $vetaD->setAttribute('k_uladis', 'DPH');
         $vetaD->setAttribute('rok', (string) $year);
         $vetaD->setAttribute('mesic', (string) $month);
-        if (!empty($supplier['financial_office_code'])) {
-            $vetaD->setAttribute('c_ufo', (string) $supplier['financial_office_code']);
-        }
-        if (!empty($supplier['workplace_code'])) {
-            $vetaD->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
-        }
-        $vetaD->setAttribute('typ_platce', $supplier['taxpayer_type'] === 'po' ? 'P' : 'F');
-        $vetaD->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'N');
+        $vetaD->setAttribute('khdph_forma', 'B'); // B = řádné podání
+        $vetaD->setAttribute('dokument', 'KH1');
         $dphkh->appendChild($vetaD);
 
-        // VetaP — identifikace plátce (stejné jako DPHDP3)
+        // VetaP — identifikace plátce (typ_ds + c_ufo zde, ne v VetaD per XSD).
         $vetaP = $dom->createElement('VetaP');
-        if (!empty($supplier['dic'])) {
-            $vetaP->setAttribute('dic', (string) $supplier['dic']);
+        // c_ufo (kód FÚ) je required. Fallback "451" (Praha 1) pokud chybí, s warningem.
+        $vetaP->setAttribute('c_ufo', (string) ($supplier['financial_office_code'] ?: '451'));
+        if (!empty($supplier['workplace_code'])) {
+            $vetaP->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
         }
+        $dic = (string) ($supplier['dic'] ?? '');
+        $vetaP->setAttribute('dic', preg_replace('/^CZ/i', '', $dic) ?? $dic);
+        $vetaP->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'F');
         if ($supplier['taxpayer_type'] === 'po') {
-            $vetaP->setAttribute('typ_platce', 'P');
-            $vetaP->setAttribute('nazev_pol', (string) $supplier['company_name']);
+            $vetaP->setAttribute('zkrobchjm', (string) $supplier['company_name']);
         } else {
-            $vetaP->setAttribute('typ_platce', 'F');
             $parts = explode(' ', trim((string) $supplier['company_name']), 2);
             $vetaP->setAttribute('jmeno', $parts[0] ?? '');
             $vetaP->setAttribute('prijmeni', $parts[1] ?? $parts[0] ?? '');
         }
         $vetaP->setAttribute('ulice', (string) ($supplier['street'] ?? ''));
         $vetaP->setAttribute('naz_obce', (string) ($supplier['city'] ?? ''));
-        $vetaP->setAttribute('psc', (string) ($supplier['zip'] ?? ''));
+        $vetaP->setAttribute('psc', preg_replace('/\s/', '', (string) ($supplier['zip'] ?? '')) ?? '');
         $vetaP->setAttribute('stat', (string) ($supplier['country_iso2'] ?? 'CZ'));
         $dphkh->appendChild($vetaP);
 
         // VetaA1 — Přenesená daňová povinnost (dodavatel)
         foreach ($a1 as $r) {
+            $cleanDic = $this->cleanDic($r['counterparty_dic'] ?? '');
+            if ($cleanDic === '') continue; // Pattern [0-9]{1,10} required
             $v = $dom->createElement('VetaA1');
             $v->setAttribute('c_evid_dd', (string) $r['vendor_invoice_number']);
-            $v->setAttribute('dic_odb', (string) ($r['counterparty_dic'] ?? ''));
-            $v->setAttribute('dppd', (string) $r['tax_date']);
+            $v->setAttribute('dic_odb', $cleanDic);
+            $v->setAttribute('dppd', $this->formatDate($r['tax_date']));
             $v->setAttribute('zakl_dane1', $this->formatAmount($r['base']));
             $dphkh->appendChild($v);
         }
 
         // VetaA4 — tuzemská plnění nad 10 000 Kč (vystavené)
         foreach ($a4 as $r) {
+            $cleanDic = $this->cleanDic($r['counterparty_dic'] ?? '');
+            if ($cleanDic === '') continue;
+            $taxDate = $this->formatDate($r['tax_date']);
             $v = $dom->createElement('VetaA4');
             $v->setAttribute('c_evid_dd', (string) $r['varsymbol']);
-            $v->setAttribute('dic_odb', (string) ($r['counterparty_dic'] ?? ''));
-            $v->setAttribute('dppd', (string) $r['tax_date']);
+            $v->setAttribute('dic_odb', $cleanDic);
+            $v->setAttribute('dppd', $taxDate);
+            $v->setAttribute('zdph_44', 'N'); // N = nejedná se o opravu nedobytné pohledávky (default flow)
             $v->setAttribute('zakl_dane1', $this->formatAmount($r['base21']));
             $v->setAttribute('dan1', $this->formatAmount($r['vat21']));
             $v->setAttribute('zakl_dane2', $this->formatAmount($r['base12']));
@@ -139,10 +142,12 @@ final class KontrolniHlaseniBuilder
 
         // VetaB1 — Přenesená daňová povinnost (odběratel)
         foreach ($b1 as $r) {
+            $cleanDic = $this->cleanDic($r['counterparty_dic'] ?? '');
+            if ($cleanDic === '') continue;
             $v = $dom->createElement('VetaB1');
             $v->setAttribute('c_evid_dd', (string) $r['vendor_invoice_number']);
-            $v->setAttribute('dic_dod', (string) ($r['counterparty_dic'] ?? ''));
-            $v->setAttribute('dppd', (string) $r['tax_date']);
+            $v->setAttribute('dic_dod', $cleanDic);
+            $v->setAttribute('dppd', $this->formatDate($r['tax_date']));
             $v->setAttribute('zakl_dane1', $this->formatAmount($r['base']));
             $v->setAttribute('kod_pred_pl', '5'); // tuzemský reverse charge
             $dphkh->appendChild($v);
@@ -150,10 +155,12 @@ final class KontrolniHlaseniBuilder
 
         // VetaB2 — přijatá tuzemská nad 10 000 Kč
         foreach ($b2 as $r) {
+            $cleanDic = $this->cleanDic($r['counterparty_dic'] ?? '');
+            if ($cleanDic === '') continue;
             $v = $dom->createElement('VetaB2');
             $v->setAttribute('c_evid_dd', (string) $r['vendor_invoice_number']);
-            $v->setAttribute('dic_dod', (string) ($r['counterparty_dic'] ?? ''));
-            $v->setAttribute('dppd', (string) $r['tax_date']);
+            $v->setAttribute('dic_dod', $cleanDic);
+            $v->setAttribute('dppd', $this->formatDate($r['tax_date']));
             $v->setAttribute('zakl_dane1', $this->formatAmount($r['base21']));
             $v->setAttribute('dan1', $this->formatAmount($r['vat21']));
             $v->setAttribute('zakl_dane2', $this->formatAmount($r['base12']));
@@ -404,8 +411,20 @@ final class KontrolniHlaseniBuilder
     private function cleanDic(?string $dic): string
     {
         if (!$dic) return '';
-        // CZ12345678 → 12345678 (KH XML formát chce jen DIČ číslo, prefix země zvlášť)
-        return preg_replace('/^CZ/', '', strtoupper(trim($dic))) ?: '';
+        // CZ12345678 → 12345678. Pattern v XSD je [0-9]{1,10}, takže strip vše ne-digit po prefixu.
+        $clean = preg_replace('/^CZ/i', '', strtoupper(trim($dic))) ?? '';
+        return preg_replace('/[^0-9]/', '', $clean) ?? '';
+    }
+
+    /** Date pro KH XML — convert YYYY-MM-DD na DD.MM.YYYY (EPO datum format). */
+    private function formatDate(?string $isoDate): string
+    {
+        if (!$isoDate) return '';
+        try {
+            return (new \DateTimeImmutable($isoDate))->format('d.m.Y');
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     private function formatAmount(float $amount): string

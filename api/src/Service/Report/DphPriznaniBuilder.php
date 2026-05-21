@@ -71,86 +71,87 @@ final class DphPriznaniBuilder
         $dphdp3->setAttribute('verzePis', '03.01');
         $pisemnost->appendChild($dphdp3);
 
-        // ── VetaD: identifikační údaje plátce ─────────────────────────
+        // ── VetaD: identifikační údaje (typ podání + perioda) ─────────
+        // POZOR: typ_platce + typ_ds jsou v VetaP, ne VetaD (per EPO XSD).
         $vetaD = $dom->createElement('VetaD');
         $vetaD->setAttribute('k_uladis', 'DPH');
         $vetaD->setAttribute('rok', (string) $year);
-        // Quarterly: EPO XML schema používá pole "ctvrt" (1-4) místo "mesic"
         if ($quarter !== null) {
             $vetaD->setAttribute('ctvrt', (string) $quarter);
         } else {
             $vetaD->setAttribute('mesic', (string) $month);
         }
-        if (!empty($supplier['financial_office_code'])) {
-            $vetaD->setAttribute('c_ufo', (string) $supplier['financial_office_code']);
-        }
-        if (!empty($supplier['workplace_code'])) {
-            $vetaD->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
-        }
-        $vetaD->setAttribute('typ_platce', $supplier['taxpayer_type'] === 'po' ? 'P' : 'F');
-        $vetaD->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'N');
+        $vetaD->setAttribute('dapdph_forma', 'B'); // B = řádné (default), O/D/E = opravné/dodatečné
+        $vetaD->setAttribute('dokument', 'DP3');   // identifikace typu výkazu
+        $vetaD->setAttribute('typ_platce', 'P');   // P = plátce DPH (default; I = identifikovaná, S = skupina, N = neplátce)
         $dphdp3->appendChild($vetaD);
 
         // ── VetaP: identifikace daňového subjektu ─────────────────────
         $vetaP = $dom->createElement('VetaP');
-        if (!empty($supplier['dic'])) {
-            $vetaP->setAttribute('dic', (string) $supplier['dic']);
+        $vetaP->setAttribute('c_ufo', (string) ($supplier['financial_office_code'] ?: '451'));
+        if (!empty($supplier['workplace_code'])) {
+            $vetaP->setAttribute('c_pracufo', (string) $supplier['workplace_code']);
         }
+        // DIČ — pattern [0-9]{1,10}, takže strip "CZ" prefix.
+        $dic = (string) ($supplier['dic'] ?? '');
+        $dicDigits = preg_replace('/^CZ/i', '', $dic) ?? $dic;
+        $vetaP->setAttribute('dic', $dicDigits);
+        $vetaP->setAttribute('typ_ds', $supplier['data_box_type'] ?: 'F'); // F=fyzická, P=právnická, N=žádná DS
+
         if ($supplier['taxpayer_type'] === 'po') {
-            $vetaP->setAttribute('typ_platce', 'P');
-            $vetaP->setAttribute('nazev_pol', (string) $supplier['company_name']);
+            // PO: zkrobchjm (zkrácené obchodní jméno, ne nazev_pol)
+            $vetaP->setAttribute('zkrobchjm', (string) $supplier['company_name']);
         } else {
-            $vetaP->setAttribute('typ_platce', 'F');
-            // FO: jméno a příjmení — zkusíme rozparsovat company_name
             $parts = explode(' ', trim((string) $supplier['company_name']), 2);
             $vetaP->setAttribute('jmeno', $parts[0] ?? '');
             $vetaP->setAttribute('prijmeni', $parts[1] ?? $parts[0] ?? '');
         }
         $vetaP->setAttribute('ulice', (string) ($supplier['street'] ?? ''));
         $vetaP->setAttribute('naz_obce', (string) ($supplier['city'] ?? ''));
-        $vetaP->setAttribute('psc', (string) ($supplier['zip'] ?? ''));
+        $vetaP->setAttribute('psc', preg_replace('/\s/', '', (string) ($supplier['zip'] ?? '')) ?? '');
         $vetaP->setAttribute('stat', (string) ($supplier['country_iso2'] ?? 'CZ'));
         if (!empty($supplier['email'])) {
             $vetaP->setAttribute('email', (string) $supplier['email']);
         }
-        if (!empty($supplier['phone'])) {
-            $vetaP->setAttribute('telef_cislo', (string) $supplier['phone']);
-        }
         $dphdp3->appendChild($vetaP);
 
-        // ── Veta1-3: jednotlivé řádky DPH přiznání ─────────────────────
-        // Řádky 1+2: tuzemská plnění s nárokem (vystavená 21% / 12%)
-        // Řádky 40+41: tuzemská plnění s odpočtem (přijatá 21% / 12%)
-        // Souhrn agregovaný z VetaD/P + data lines
+        // ── Veta1: tuzemská plnění (řádky 1, 2, 40, 41) ────────────────
+        // Schema má pevná pole: obrat23/dan23 (ř.1, sale 21%), obrat5/dan5 (ř.2, sale 12%),
+        // p_zb23/dan_pzb23 (ř.40, purchase 21%), p_zb5/dan_pzb5 (ř.41, purchase 12%).
         $totalDanZdanitelne = 0.0;
         $totalDanOdpocitatelne = 0.0;
+        $veta1Attrs = []; // map line# → [obrat_attr, dan_attr]
+        $lineMap = [
+            '1'  => ['obrat23', 'dan23'],     // sale 21%
+            '2'  => ['obrat5',  'dan5'],      // sale 12%
+            '40' => ['p_zb23',  'dan_pzb23'], // purchase 21% (s odpočtem)
+            '41' => ['p_zb5',   'dan_pzb5'],  // purchase 12% (s odpočtem)
+        ];
         foreach ($lines as $lineNum => $data) {
-            $vetaLine = $dom->createElement('Veta' . $this->vetaTypeForLine((string) $lineNum));
-            $vetaLine->setAttribute('c_radku', (string) $lineNum);
-            $vetaLine->setAttribute('zaklad', $this->formatAmount($data['base']));
-            $vetaLine->setAttribute('dan', $this->formatAmount($data['vat']));
-            $vetaLine->setAttribute('popis', $data['label']);
-            $dphdp3->appendChild($vetaLine);
-
-            // Aggregate totals pro VetaR (rekapitulace)
-            if ($this->isOutputLine((string) $lineNum)) {
+            $lineKey = (string) $lineNum;
+            if (isset($lineMap[$lineKey])) {
+                [$obratAttr, $danAttr] = $lineMap[$lineKey];
+                $veta1Attrs[$obratAttr] = $this->formatAmount($data['base']);
+                $veta1Attrs[$danAttr]   = $this->formatAmount($data['vat']);
+            }
+            if ($this->isOutputLine($lineKey)) {
                 $totalDanZdanitelne += $data['vat'];
             } else {
                 $totalDanOdpocitatelne += $data['vat'];
             }
         }
-
-        // ── VetaR: rekapitulace ───────────────────────────────────────
-        $vetaR = $dom->createElement('VetaR');
-        $vetaR->setAttribute('dan_zdanit_pln', $this->formatAmount($totalDanZdanitelne));
-        $vetaR->setAttribute('odpoc_dan_celkem', $this->formatAmount($totalDanOdpocitatelne));
-        $vlastniDan = $totalDanZdanitelne - $totalDanOdpocitatelne;
-        if ($vlastniDan >= 0) {
-            $vetaR->setAttribute('dan_zocp', $this->formatAmount($vlastniDan));  // daň na výstupu
-        } else {
-            $vetaR->setAttribute('nadm_odp', $this->formatAmount(abs($vlastniDan)));  // nadměrný odpočet
+        if (!empty($veta1Attrs)) {
+            $veta1 = $dom->createElement('Veta1');
+            foreach ($veta1Attrs as $k => $v) $veta1->setAttribute($k, $v);
+            $dphdp3->appendChild($veta1);
         }
+
+        // ── VetaR: poradi (wrapper element, summary attrs jdou jinam) ────
+        $vetaR = $dom->createElement('VetaR');
+        $vetaR->setAttribute('poradi', '1');
         $dphdp3->appendChild($vetaR);
+
+        $vlastniDan = $totalDanZdanitelne - $totalDanOdpocitatelne;
 
         // Termín podání: 25. den následujícího měsíce po skončení období
         $deadlineMonth = $quarter !== null ? ($quarter * 3 + 1) : ($month + 1);

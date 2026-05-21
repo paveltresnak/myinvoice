@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { clientsApi, type Client } from '@/api/clients'
 import { formatMoney, formatDate } from '@/composables/useFormat'
@@ -21,7 +21,12 @@ const loadingMore = ref(false)
 const search = ref('')
 const showArchived = ref(false)
 const sort = ref<'name' | 'revenue' | 'last_activity'>('name')
-const roleFilter = ref<RoleFilter>('customers')
+const route = useRoute()
+// Initial filter from ?role=vendors|all (default customers)
+const roleFilter = ref<RoleFilter>(((): RoleFilter => {
+  const q = String(route.query.role ?? '')
+  return q === 'vendors' || q === 'all' ? q : 'customers'
+})())
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Klient-side role filter (backend zatím vrací všechny; přepsání na server-side filter
