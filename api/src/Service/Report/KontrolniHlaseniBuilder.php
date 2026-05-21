@@ -254,14 +254,14 @@ final class KontrolniHlaseniBuilder
     private function collectReceivedRows(int $supplierId, string $start, string $end): array
     {
         $stmt = $this->db->pdo()->prepare("
-            SELECT pi.id, pi.vendor_invoice_number, COALESCE(pi.tax_date, pi.issue_date) AS tax_date,
+            SELECT pi.id, pi.vendor_invoice_number, GREATEST(pi.tax_date, pi.issue_date) AS tax_date,
                    pi.total_with_vat,
                    c.dic AS counterparty_dic, c.company_name AS counterparty_name
               FROM purchase_invoices pi
               JOIN clients c ON c.id = pi.vendor_id
              WHERE pi.supplier_id = ?
                AND pi.status NOT IN ('draft', 'cancelled')
-               AND COALESCE(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
+               AND GREATEST(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
         ");
         $stmt->execute([$supplierId, $start, $end]);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -327,7 +327,7 @@ final class KontrolniHlaseniBuilder
     private function collectReverseChargePurchases(int $supplierId, string $start, string $end): array
     {
         $stmt = $this->db->pdo()->prepare("
-            SELECT pi.id, pi.vendor_invoice_number, COALESCE(pi.tax_date, pi.issue_date) AS tax_date,
+            SELECT pi.id, pi.vendor_invoice_number, GREATEST(pi.tax_date, pi.issue_date) AS tax_date,
                    pi.total_without_vat AS base, c.dic AS counterparty_dic
               FROM purchase_invoices pi
               JOIN clients c ON c.id = pi.vendor_id
@@ -335,7 +335,7 @@ final class KontrolniHlaseniBuilder
              WHERE pi.supplier_id = ?
                AND pi.status NOT IN ('draft', 'cancelled')
                AND vc.is_reverse_charge = 1
-               AND COALESCE(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
+               AND GREATEST(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
         ");
         $stmt->execute([$supplierId, $start, $end]);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);

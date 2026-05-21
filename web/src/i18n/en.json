@@ -195,6 +195,7 @@
       "pohoda": "Pohoda XML"
     },
     "new_vendor": "New vendor",
+    "vendor_detail": "Vendor detail",
     "filters": {
       "all_statuses": "All statuses",
       "all_kinds": "All types",

@@ -149,7 +149,7 @@ final class VatClassificationMapper
              JOIN purchase_invoice_items pii ON pii.purchase_invoice_id = pi.id
             WHERE pi.supplier_id = ?
               AND pi.status NOT IN ('draft', 'cancelled')
-              AND COALESCE(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
+              AND GREATEST(pi.tax_date, pi.issue_date) BETWEEN ? AND ?
          GROUP BY code"
         );
         $rows->execute([$supplierId, $start, $end]);

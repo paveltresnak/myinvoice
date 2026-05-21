@@ -149,7 +149,7 @@ final class IncomeTaxBuilder
               WHERE pi.supplier_id = ?
                 AND pi.status NOT IN ('draft', 'cancelled')
                 AND COALESCE(c.code, 'CZK') = 'CZK'
-                AND COALESCE(pi.tax_date, pi.issue_date) BETWEEN ? AND ?"
+                AND GREATEST(pi.tax_date, pi.issue_date) BETWEEN ? AND ?"
         );
         $stmt->execute([$supplierId, $start, $end]);
         $costs = (float) ($stmt->fetchColumn() ?: 0);

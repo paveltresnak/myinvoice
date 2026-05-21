@@ -86,7 +86,14 @@ final class PurchaseInvoiceRepository
     }
 
     /**
-     * Seznam přijatých faktur tenantu, seskupený po měsících podle COALESCE(tax_date, issue_date).
+     * Seznam přijatých faktur tenantu, seskupený po měsících podle **issue_date**
+     * (datum vystavení faktury dodavatelem).
+     *
+     * Pozn.: NEpoužíváme DUZP (tax_date) protože dodavatel může vystavit fakturu
+     * v jiném měsíci než je DUZP — typicky DUZP konec měsíce, vystavení následující
+     * měsíc. Z účetního hlediska user fakturu uplatní v měsíci, kdy ji obdrží/byla
+     * vystavena dodavatelem, ne v měsíci DUZP. DPH přiznání má vlastní logic dle
+     * tax_date — viz DphPriznaniBuilder.
      *
      * Output: ['data' => [{month, count, totals_per_currency, invoices: [...]}], 'meta' => ...]
      *
@@ -121,19 +128,19 @@ final class PurchaseInvoiceRepository
             $params[] = (int) $filters['vendor_id'];
         }
         if (!empty($filters['year'])) {
-            $where[] = 'YEAR(COALESCE(pi.tax_date, pi.issue_date)) = ?';
+            $where[] = 'YEAR(pi.issue_date) = ?';
             $params[] = (int) $filters['year'];
         }
         if (!empty($filters['month'])) {
-            $where[] = 'MONTH(COALESCE(pi.tax_date, pi.issue_date)) = ?';
+            $where[] = 'MONTH(pi.issue_date) = ?';
             $params[] = (int) $filters['month'];
         }
         if (!empty($filters['date_from'])) {
-            $where[] = 'COALESCE(pi.tax_date, pi.issue_date) >= ?';
+            $where[] = 'pi.issue_date >= ?';
             $params[] = (string) $filters['date_from'];
         }
         if (!empty($filters['date_to'])) {
-            $where[] = 'COALESCE(pi.tax_date, pi.issue_date) <= ?';
+            $where[] = 'pi.issue_date <= ?';
             $params[] = (string) $filters['date_to'];
         }
         if (!empty($filters['currency'])) {
@@ -170,13 +177,13 @@ final class PurchaseInvoiceRepository
                        pi.advance_paid_amount, pi.amount_to_pay,
                        pi.status, pi.booked_at, pi.paid_at, pi.cancelled_at,
                        c.company_name AS vendor_company_name, c.ic AS vendor_ic,
-                       DATE_FORMAT(COALESCE(pi.tax_date, pi.issue_date), '%Y-%m') AS month_bucket
+                       DATE_FORMAT(pi.issue_date, '%Y-%m') AS month_bucket
                        {$selectTotal}
                   FROM purchase_invoices pi
                   JOIN clients c ON c.id = pi.vendor_id
                   JOIN currencies cur ON cur.id = pi.currency_id
                  WHERE $whereSql
-                 ORDER BY COALESCE(pi.tax_date, pi.issue_date) DESC, pi.id DESC";
+                 ORDER BY pi.issue_date DESC, pi.id DESC";
 
         $offset = 0;
         if ($perPage > 0) {

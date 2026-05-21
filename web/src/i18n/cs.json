@@ -195,6 +195,7 @@
       "pohoda": "Pohoda XML"
     },
     "new_vendor": "Nový dodavatel",
+    "vendor_detail": "Detail dodavatele",
     "filters": {
       "all_statuses": "Všechny stavy",
       "all_kinds": "Všechny typy",
