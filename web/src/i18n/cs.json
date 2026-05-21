@@ -206,8 +206,13 @@
       "title": "Klasifikace",
       "expense_category": "Kategorie nákladu",
       "no_category": "(bez kategorie)",
-      "manage_categories": "Spravovat kategorie v Číselnících →"
+      "manage_categories": "Spravovat kategorie v Číselnících →",
+      "vat_classification": "VAT klasifikace (DPH přiznání)",
+      "no_vat_class": "(auto-default podle sazby)",
+      "vat_classification_hint": "Pokud nevyberete, systém auto-přiřadí kód podle sazby DPH (21%→40, 12%→41, 0%→42, reverse→5)."
     },
+    "force_edit": "Upravit (force)",
+    "force_edit_hint": "Admin only — úprava received/booked faktury. Po uložení se přepočítají sumy.",
     "bulk": {
       "mark_booked": "Označit zaúčtováno ({n})",
       "mark_paid": "Označit zaplaceno ({n})",

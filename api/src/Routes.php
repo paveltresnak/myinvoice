@@ -170,6 +170,12 @@ final class Routes
         $app->put   ('/api/expense-categories/{id:[0-9]+}',      [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'update']);
         $app->delete('/api/expense-categories/{id:[0-9]+}',      [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'delete']);
 
+        // VAT klasifikační kódy (pro DPHDP3 + KH)
+        $app->get   ('/api/vat-classifications',                 [\MyInvoice\Action\Codebook\VatClassificationsAction::class, 'list']);
+        $app->post  ('/api/vat-classifications',                 [\MyInvoice\Action\Codebook\VatClassificationsAction::class, 'create']);
+        $app->put   ('/api/vat-classifications/{id:[0-9]+}',     [\MyInvoice\Action\Codebook\VatClassificationsAction::class, 'update']);
+        $app->delete('/api/vat-classifications/{id:[0-9]+}',     [\MyInvoice\Action\Codebook\VatClassificationsAction::class, 'delete']);
+
         // Clients
         $app->get   ('/api/clients',                 ListClientsAction::class);
         $app->post  ('/api/clients',                 CreateClientAction::class);

@@ -11,6 +11,7 @@ use MyInvoice\Repository\ClientRepository;
 use MyInvoice\Repository\PurchaseInvoiceRepository;
 use MyInvoice\Service\ActivityLogger;
 use MyInvoice\Service\Invoice\PurchaseInvoiceCalculator;
+use MyInvoice\Service\Report\VatClassificationDefaulter;
 use MyInvoice\Service\IpMatcher;
 use MyInvoice\Service\Validation\PurchaseInvoiceValidation;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -28,6 +29,7 @@ final class UpdatePurchaseInvoiceAction
         private readonly PurchaseInvoiceRepository $repo,
         private readonly ClientRepository $clients,
         private readonly PurchaseInvoiceCalculator $calc,
+        private readonly VatClassificationDefaulter $vatDefaulter,
         private readonly ActivityLogger $logger,
         private readonly IpMatcher $ipMatcher,
     ) {}
@@ -50,9 +52,12 @@ final class UpdatePurchaseInvoiceAction
         $isForce = !empty($request->getQueryParams()['force']);
 
         if ($existing['status'] !== 'draft') {
-            // Pouze admin smí force-update u received; booked/paid/cancelled jsou immutable
-            if (!$isAdmin || !$isForce || in_array($existing['status'], ['booked', 'paid', 'cancelled'], true)) {
-                return Json::error($response, 'not_editable', 'Tuto fakturu nelze upravit.', 409);
+            // Force-update: admin smí upravit received nebo booked (s ?force=1).
+            // paid/cancelled zůstávají immutable (financial integrity).
+            if (!$isAdmin || !$isForce || in_array($existing['status'], ['paid', 'cancelled'], true)) {
+                return Json::error($response, 'not_editable',
+                    "Faktura ve stavu '{$existing['status']}' nelze upravit. Admin může upravit received/booked s ?force=1.",
+                    409);
             }
         }
 
@@ -72,6 +77,9 @@ final class UpdatePurchaseInvoiceAction
             $this->clients->markAsVendor((int) $vendor['id']);
         }
 
+        // Auto-default VAT klasifikace pokud uživatel nezadal — na header i items.
+        $this->applyVatClassificationDefaults($body);
+
         try {
             $this->repo->updateDraft($id, $body, $supplierId);
         } catch (\InvalidArgumentException $e) {
@@ -85,5 +93,42 @@ final class UpdatePurchaseInvoiceAction
         $this->logger->log($action, $user['id'] ?? null, 'purchase_invoice', $id, null, $ip, $request->getHeaderLine('User-Agent'));
 
         return Json::ok($response, $this->repo->find($id, $supplierId));
+    }
+
+    /**
+     * Auto-default vat_classification_code podle vat_rate na řádcích a header.
+     * Aplikuje se jen pokud user nezadal (NULL nebo prázdný string).
+     */
+    private function applyVatClassificationDefaults(array &$body): void
+    {
+        $vatRates = $this->repo->vatRateMap();  // id → rate_percent
+        $reverseCharge = !empty($body['reverse_charge']);
+
+        // Items first — needed pro header dominantní sazby
+        if (!empty($body['items']) && is_array($body['items'])) {
+            foreach ($body['items'] as &$item) {
+                if (!empty($item['vat_classification_code'])) continue;
+                $rateId = (int) ($item['vat_rate_id'] ?? 0);
+                $rate = (float) ($vatRates[$rateId] ?? 0);
+                $item['vat_classification_code'] = $this->vatDefaulter->defaultForPurchase($rate, $reverseCharge);
+            }
+            unset($item);
+        }
+
+        // Header default
+        if (empty($body['vat_classification_code']) && !empty($body['items'])) {
+            $itemsWithTotals = array_map(function ($it) use ($vatRates) {
+                $rateId = (int) ($it['vat_rate_id'] ?? 0);
+                $rate = (float) ($vatRates[$rateId] ?? 0);
+                $qty = (float) ($it['quantity'] ?? 1);
+                $price = (float) ($it['unit_price_without_vat'] ?? 0);
+                return ['vat_rate' => $rate, 'total_with_vat' => $qty * $price * (1 + $rate / 100)];
+            }, (array) $body['items']);
+            $body['vat_classification_code'] = $this->vatDefaulter->suggestHeaderForInvoice(
+                $itemsWithTotals,
+                (bool) ($body['reverse_charge'] ?? false),
+                'purchase',
+            );
+        }
     }
 }

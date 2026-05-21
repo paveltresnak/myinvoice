@@ -5,12 +5,14 @@ import { useI18n } from 'vue-i18n'
 import { purchaseInvoicesApi, type PurchaseInvoice, type PurchaseInvoiceStatus } from '@/api/purchaseInvoices'
 import { formatMoney, formatDate } from '@/composables/useFormat'
 import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
 import { apiErrorMessage } from '@/api/errors'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const auth = useAuthStore()
 
 const invoice = ref<PurchaseInvoice | null>(null)
 const loading = ref(true)
@@ -111,6 +113,12 @@ const allowedTransitions = computed<PurchaseInvoiceStatus[]>(() => {
 })
 
 const canEdit = computed(() => invoice.value?.status === 'draft')
+// Force-edit pro received/booked — admin only (paid/cancelled jsou immutable)
+const canForceEdit = computed(() =>
+  auth.user?.role === 'admin' &&
+  invoice.value &&
+  ['received', 'booked'].includes(invoice.value.status)
+)
 const canDelete = computed(() => invoice.value?.status === 'draft')
 
 /**
@@ -171,6 +179,13 @@ function transitionLabel(target: PurchaseInvoiceStatus): string {
           class="cursor-pointer px-3 h-9 text-sm border border-neutral-300 rounded-md text-neutral-700 hover:bg-neutral-50 inline-flex items-center gap-1.5">
           <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
           {{ t('common.edit') }}
+        </RouterLink>
+        <!-- Force-edit pro received/booked (admin only) -->
+        <RouterLink v-else-if="canForceEdit" :to="`/purchase-invoices/${invoice.id}/edit?force=1`"
+          class="cursor-pointer px-3 h-9 text-sm border border-warning-500/40 rounded-md text-warning-600 hover:bg-warning-50 inline-flex items-center gap-1.5"
+          :title="t('purchase_invoice.force_edit_hint')">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          {{ t('purchase_invoice.force_edit') }}
         </RouterLink>
         <a v-if="invoice.pdf_path" :href="purchaseInvoicesApi.pdfUrl(invoice.id)" target="_blank"
           class="cursor-pointer px-3 h-9 text-sm border border-primary-500/40 rounded-md text-primary-700 hover:bg-primary-50 inline-flex items-center gap-1.5">

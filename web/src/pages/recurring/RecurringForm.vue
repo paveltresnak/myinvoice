@@ -618,14 +618,14 @@ async function submit() {
           <tbody>
             <tr v-for="(it, idx) in form.items" :key="idx" :class="['border-t border-neutral-100', itemHasBothNegative(it) ? 'bg-danger-50' : '']">
               <td class="py-1.5 pr-2"><input v-model="it.description" type="text" class="w-full h-8 px-2 border border-neutral-200 rounded" /></td>
-              <td class="py-1.5 pr-2"><input v-model.number="it.quantity" v-math type="text" inputmode="decimal" :class="['w-full h-8 px-2 border rounded text-right font-mono', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" /></td>
+              <td class="py-1.5 pr-2"><input v-model="it.quantity" v-math type="text" inputmode="decimal" :class="['w-full h-8 px-2 border rounded text-right font-mono', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" /></td>
               <td class="py-1.5 pr-2">
                 <select v-model="it.unit" class="w-full h-8 px-1 border border-neutral-200 rounded bg-white text-sm">
                   <option v-for="u in units" :key="u.id" :value="u.code">{{ u.code }}</option>
                   <option v-if="it.unit && !units.some(u => u.code === it.unit)" :value="it.unit">{{ it.unit }}</option>
                 </select>
               </td>
-              <td class="py-1.5 pr-2"><input v-model.number="it.unit_price_without_vat" v-math type="text" inputmode="decimal" :class="['w-full h-8 px-2 border rounded text-right font-mono', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" /></td>
+              <td class="py-1.5 pr-2"><input v-model="it.unit_price_without_vat" v-math type="text" inputmode="decimal" :class="['w-full h-8 px-2 border rounded text-right font-mono', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" /></td>
               <td class="py-1.5 pr-2">
                 <select v-model.number="it.vat_rate_id" class="w-full h-8 px-2 border border-neutral-200 rounded bg-white">
                   <option v-for="r in vatRates" :key="r.id" :value="r.id">

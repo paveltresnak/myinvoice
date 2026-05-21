@@ -96,6 +96,8 @@ const form = ref<{
   payment_method: 'bank_transfer' | 'card' | 'cash' | 'other'
   exchange_rate: number | null
   varsymbol: string  // Ruční override čísla faktury (prázdný = generuje se při issue)
+  vat_classification_code: string | null
+  revenue_category: string | null
   items: InvoiceItem[]
 }>({
   invoice_type: 'invoice',
@@ -115,6 +117,8 @@ const form = ref<{
   payment_method: 'bank_transfer',
   exchange_rate: null,
   varsymbol: '',
+  vat_classification_code: null,
+  revenue_category: null,
   items: [],
 })
 
@@ -999,7 +1003,7 @@ async function deleteDraft() {
                   class="w-full px-2 py-1.5 border border-neutral-200 rounded text-sm resize-y min-h-[36px] focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"></textarea>
               </td>
               <td class="px-3 py-2">
-                <input v-model.number="item.quantity" v-math type="text" inputmode="decimal"
+                <input v-model="item.quantity" v-math type="text" inputmode="decimal"
                   :class="['w-full h-9 px-2 border rounded text-right font-mono text-sm', itemHasBothNegative(item) ? 'border-danger-400' : 'border-neutral-200']" />
               </td>
               <td class="px-3 py-2">
@@ -1009,7 +1013,7 @@ async function deleteDraft() {
                 </select>
               </td>
               <td class="px-3 py-2">
-                <input v-model.number="item.unit_price_without_vat" v-math type="text" inputmode="decimal"
+                <input v-model="item.unit_price_without_vat" v-math type="text" inputmode="decimal"
                   :class="['w-full h-9 px-2 border rounded text-right font-mono text-sm', itemHasBothNegative(item) ? 'border-danger-400' : 'border-neutral-200']" />
               </td>
               <td v-if="supplierIsVatPayer" class="px-3 py-2">
@@ -1055,7 +1059,7 @@ async function deleteDraft() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.qty') }}</label>
-                <input v-model.number="item.quantity" v-math type="text" inputmode="decimal"
+                <input v-model="item.quantity" v-math type="text" inputmode="decimal"
                   :class="['w-full h-10 px-3 border rounded text-right font-mono text-sm', itemHasBothNegative(item) ? 'border-danger-400' : 'border-neutral-200']" />
               </div>
               <div>
@@ -1069,7 +1073,7 @@ async function deleteDraft() {
             <div :class="supplierIsVatPayer ? 'grid grid-cols-2 gap-2' : ''">
               <div>
                 <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.unit_price') }}</label>
-                <input v-model.number="item.unit_price_without_vat" v-math type="text" inputmode="decimal"
+                <input v-model="item.unit_price_without_vat" v-math type="text" inputmode="decimal"
                   :class="['w-full h-10 px-3 border rounded text-right font-mono text-sm', itemHasBothNegative(item) ? 'border-danger-400' : 'border-neutral-200']" />
               </div>
               <div v-if="supplierIsVatPayer">

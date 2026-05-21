@@ -206,8 +206,13 @@
       "title": "Classification",
       "expense_category": "Expense category",
       "no_category": "(no category)",
-      "manage_categories": "Manage categories in Codebooks →"
+      "manage_categories": "Manage categories in Codebooks →",
+      "vat_classification": "VAT classification (VAT return)",
+      "no_vat_class": "(auto-default by rate)",
+      "vat_classification_hint": "If unset, system auto-assigns code by VAT rate (21%→40, 12%→41, 0%→42, reverse→5)."
     },
+    "force_edit": "Edit (force)",
+    "force_edit_hint": "Admin only — edit received/booked invoice. Totals will be recomputed.",
     "bulk": {
       "mark_booked": "Mark booked ({n})",
       "mark_paid": "Mark paid ({n})",

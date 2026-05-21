@@ -13,6 +13,7 @@ import {
 } from '@/api/purchaseInvoices'
 import { codebooksApi, type VatRate, type Currency, type Unit } from '@/api/codebooks'
 import { expenseCategoriesApi, type ExpenseCategory } from '@/api/expenseCategories'
+import { vatClassificationsApi, type VatClassification } from '@/api/vatClassifications'
 import { settingsApi } from '@/api/settings'
 import { formatMoney } from '@/composables/useFormat'
 import { useToast } from '@/composables/useToast'
@@ -39,6 +40,7 @@ const vatRates = ref<VatRate[]>([])
 const currencies = ref<Currency[]>([])
 const units = ref<Unit[]>([])
 const expenseCategories = ref<ExpenseCategory[]>([])
+const vatClassifications = ref<VatClassification[]>([])
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -66,6 +68,7 @@ const form = ref<{
   paid_amount_invoice_ccy: number | null
   exchange_diff_base: number | null
   expense_category_id: number | null
+  vat_classification_code: string | null
   items: PurchaseInvoiceItem[]
 }>({
   vendor_id: null,
@@ -91,6 +94,7 @@ const form = ref<{
   paid_amount_invoice_ccy: null,
   exchange_diff_base: null,
   expense_category_id: null,
+  vat_classification_code: null,
   items: [],
 })
 
@@ -193,7 +197,7 @@ onMounted(async () => {
 
 async function loadCodebooks() {
   try {
-    const [v, c, u, ec] = await Promise.all([
+    const [v, c, u, ec, vc] = await Promise.all([
       codebooksApi.vatRates(),
       // Pro přijaté faktury chceme vidět i neaktivní měny (vendor's currency
       // může být USD/GBP, ve které nemáme bankovní účet a v Codebooks je marked
@@ -201,11 +205,13 @@ async function loadCodebooks() {
       codebooksApi.currencies(true),
       codebooksApi.units(),
       expenseCategoriesApi.list(false),  // jen aktivní pro picker
+      vatClassificationsApi.list('purchase'),
     ])
     vatRates.value = v
     currencies.value = c
     units.value = u
     expenseCategories.value = ec
+    vatClassifications.value = vc
   } catch (e) {
     error.value = apiErrorMessage(e)
   }
@@ -244,6 +250,7 @@ function populate(inv: PurchaseInvoice) {
   form.value.paid_amount_invoice_ccy = inv.paid_amount_invoice_ccy
   form.value.exchange_diff_base = inv.exchange_diff_base
   form.value.expense_category_id = inv.expense_category_id ?? null
+  form.value.vat_classification_code = inv.vat_classification_code ?? null
   form.value.items = inv.items.length > 0 ? inv.items : []
 
   if (inv.pdf_path) {
@@ -361,6 +368,7 @@ async function submit() {
       paid_amount_invoice_ccy: form.value.paid_amount_invoice_ccy,
       exchange_diff_base: form.value.exchange_diff_base,
       expense_category_id: form.value.expense_category_id,
+      vat_classification_code: form.value.vat_classification_code,
       items: form.value.items.map((it, i) => ({
         description: it.description,
         quantity: Number(it.quantity || 0),
@@ -373,7 +381,9 @@ async function submit() {
     }
     let inv: PurchaseInvoice
     if (isEdit.value && invoiceId.value) {
-      inv = await purchaseInvoicesApi.update(invoiceId.value, payload)
+      // Force flag z URL query (?force=1) — pro admin edit received/booked faktur
+      const force = String(route.query.force ?? '') === '1'
+      inv = await purchaseInvoicesApi.update(invoiceId.value, payload, force)
     } else {
       inv = await purchaseInvoicesApi.create(payload)
     }
@@ -603,7 +613,7 @@ function fieldErr(key: string): string | null {
                 <input v-model="it.description" type="text" class="w-full h-9 px-2 border border-neutral-200 rounded text-sm" />
               </td>
               <td class="py-2 px-1">
-                <input v-model.number="it.quantity" v-math type="text" inputmode="decimal" class="w-full h-9 px-2 border border-neutral-200 rounded text-sm text-right font-mono" />
+                <input v-model="it.quantity" v-math type="text" inputmode="decimal" class="w-full h-9 px-2 border border-neutral-200 rounded text-sm text-right font-mono" />
               </td>
               <td class="py-2 px-1">
                 <select v-model="it.unit" class="w-full h-9 px-1 border border-neutral-200 rounded bg-white text-sm">
@@ -611,7 +621,7 @@ function fieldErr(key: string): string | null {
                 </select>
               </td>
               <td class="py-2 px-1">
-                <input v-model.number="it.unit_price_without_vat" v-math type="text" inputmode="decimal" class="w-full h-9 px-2 border border-neutral-200 rounded text-sm text-right font-mono" />
+                <input v-model="it.unit_price_without_vat" v-math type="text" inputmode="decimal" class="w-full h-9 px-2 border border-neutral-200 rounded text-sm text-right font-mono" />
               </td>
               <td class="py-2 px-1">
                 <select v-model.number="it.vat_rate_id" class="w-full h-9 px-1 border border-neutral-200 rounded bg-white text-sm">
@@ -657,7 +667,7 @@ function fieldErr(key: string): string | null {
         />
       </div>
 
-      <!-- Box: Klasifikace (kategorie nákladů + VAT klasifikace v dalším commitu) -->
+      <!-- Box: Klasifikace (kategorie nákladů + VAT klasifikace pro DPHDP3) -->
       <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
         <h2 class="text-sm font-medium text-neutral-700 mb-3">{{ t('purchase_invoice.classification.title') }}</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -674,6 +684,16 @@ function fieldErr(key: string): string | null {
                 {{ t('purchase_invoice.classification.manage_categories') }}
               </RouterLink>
             </p>
+          </div>
+          <div>
+            <label class="block text-xs text-neutral-500 mb-1">{{ t('purchase_invoice.classification.vat_classification') }}</label>
+            <select v-model="form.vat_classification_code" class="w-full h-10 px-3 border border-neutral-300 rounded-md bg-white text-sm">
+              <option :value="null">— {{ t('purchase_invoice.classification.no_vat_class') }} —</option>
+              <option v-for="vc in vatClassifications" :key="vc.id" :value="vc.code">
+                {{ vc.code }} — {{ vc.label.length > 60 ? vc.label.slice(0, 60) + '…' : vc.label }}
+              </option>
+            </select>
+            <p class="text-xs text-neutral-500 mt-1">{{ t('purchase_invoice.classification.vat_classification_hint') }}</p>
           </div>
         </div>
       </div>
