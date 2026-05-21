@@ -309,8 +309,8 @@ final class PurchaseInvoiceRepository
              advance_paid_amount,
              payment_currency_id, payment_exchange_rate,
              paid_amount_payment_ccy, paid_amount_invoice_ccy, exchange_diff_base,
-             status, vat_classification_code, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "draft", ?, ?)';
+             status, vat_classification_code, expense_category_id, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "draft", ?, ?, ?)';
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -342,6 +342,7 @@ final class PurchaseInvoiceRepository
             isset($data['paid_amount_invoice_ccy']) ? (float) $data['paid_amount_invoice_ccy'] : null,
             isset($data['exchange_diff_base']) ? (float) $data['exchange_diff_base'] : null,
             isset($data['vat_classification_code']) ? (string) $data['vat_classification_code'] : null,
+            isset($data['expense_category_id']) && $data['expense_category_id'] ? (int) $data['expense_category_id'] : null,
             $userId,
         ]);
 
@@ -386,7 +387,7 @@ final class PurchaseInvoiceRepository
                 advance_paid_amount = ?,
                 payment_currency_id = ?, payment_exchange_rate = ?,
                 paid_amount_payment_ccy = ?, paid_amount_invoice_ccy = ?, exchange_diff_base = ?,
-                vat_classification_code = ?'
+                vat_classification_code = ?, expense_category_id = ?'
               . ($hasVarsymbol ? ', varsymbol = ?' : '')
               . ' WHERE id = ? AND supplier_id = ?';
 
@@ -413,6 +414,7 @@ final class PurchaseInvoiceRepository
             isset($data['paid_amount_invoice_ccy']) ? (float) $data['paid_amount_invoice_ccy'] : null,
             isset($data['exchange_diff_base']) ? (float) $data['exchange_diff_base'] : null,
             isset($data['vat_classification_code']) ? (string) $data['vat_classification_code'] : null,
+            isset($data['expense_category_id']) && $data['expense_category_id'] ? (int) $data['expense_category_id'] : null,
         ];
         if ($hasVarsymbol) $params[] = $manualVarsymbol;
         $params[] = $id;
@@ -670,7 +672,8 @@ final class PurchaseInvoiceRepository
 
     private function castInvoice(array $row): array
     {
-        foreach (['id', 'supplier_id', 'vendor_id', 'currency_id', 'payment_currency_id', 'created_by', 'pdf_size_bytes'] as $f) {
+        foreach (['id', 'supplier_id', 'vendor_id', 'currency_id', 'payment_currency_id',
+                  'created_by', 'pdf_size_bytes', 'expense_category_id'] as $f) {
             if (isset($row[$f]) && $row[$f] !== null) $row[$f] = (int) $row[$f];
         }
         $row['reverse_charge'] = isset($row['reverse_charge']) ? (bool) $row['reverse_charge'] : false;

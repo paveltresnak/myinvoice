@@ -164,6 +164,12 @@ final class Routes
         $app->get('/api/codebooks/units',      [CodebookAction::class, 'units']);
         $app->get('/api/codebooks/cnb-rate',   \MyInvoice\Action\Codebook\CnbRateAction::class);
 
+        // Expense categories (pro rozpad nákladů v CRM dashboardu)
+        $app->get   ('/api/expense-categories',                  [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'list']);
+        $app->post  ('/api/expense-categories',                  [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'create']);
+        $app->put   ('/api/expense-categories/{id:[0-9]+}',      [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'update']);
+        $app->delete('/api/expense-categories/{id:[0-9]+}',      [\MyInvoice\Action\Codebook\ExpenseCategoriesAction::class, 'delete']);
+
         // Clients
         $app->get   ('/api/clients',                 ListClientsAction::class);
         $app->post  ('/api/clients',                 CreateClientAction::class);

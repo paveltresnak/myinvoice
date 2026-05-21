@@ -12,6 +12,7 @@ import {
   type ExchangeRateSource,
 } from '@/api/purchaseInvoices'
 import { codebooksApi, type VatRate, type Currency, type Unit } from '@/api/codebooks'
+import { expenseCategoriesApi, type ExpenseCategory } from '@/api/expenseCategories'
 import { settingsApi } from '@/api/settings'
 import { formatMoney } from '@/composables/useFormat'
 import { useToast } from '@/composables/useToast'
@@ -37,6 +38,7 @@ const fieldErrors = ref<Record<string, string[]>>({})
 const vatRates = ref<VatRate[]>([])
 const currencies = ref<Currency[]>([])
 const units = ref<Unit[]>([])
+const expenseCategories = ref<ExpenseCategory[]>([])
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -63,6 +65,7 @@ const form = ref<{
   paid_amount_payment_ccy: number | null
   paid_amount_invoice_ccy: number | null
   exchange_diff_base: number | null
+  expense_category_id: number | null
   items: PurchaseInvoiceItem[]
 }>({
   vendor_id: null,
@@ -87,6 +90,7 @@ const form = ref<{
   paid_amount_payment_ccy: null,
   paid_amount_invoice_ccy: null,
   exchange_diff_base: null,
+  expense_category_id: null,
   items: [],
 })
 
@@ -189,17 +193,19 @@ onMounted(async () => {
 
 async function loadCodebooks() {
   try {
-    const [v, c, u] = await Promise.all([
+    const [v, c, u, ec] = await Promise.all([
       codebooksApi.vatRates(),
       // Pro přijaté faktury chceme vidět i neaktivní měny (vendor's currency
       // může být USD/GBP, ve které nemáme bankovní účet a v Codebooks je marked
       // is_active=0). Backend přes ?include_inactive=1.
       codebooksApi.currencies(true),
       codebooksApi.units(),
+      expenseCategoriesApi.list(false),  // jen aktivní pro picker
     ])
     vatRates.value = v
     currencies.value = c
     units.value = u
+    expenseCategories.value = ec
   } catch (e) {
     error.value = apiErrorMessage(e)
   }
@@ -237,6 +243,7 @@ function populate(inv: PurchaseInvoice) {
   form.value.paid_amount_payment_ccy = inv.paid_amount_payment_ccy
   form.value.paid_amount_invoice_ccy = inv.paid_amount_invoice_ccy
   form.value.exchange_diff_base = inv.exchange_diff_base
+  form.value.expense_category_id = inv.expense_category_id ?? null
   form.value.items = inv.items.length > 0 ? inv.items : []
 
   if (inv.pdf_path) {
@@ -353,6 +360,7 @@ async function submit() {
       paid_amount_payment_ccy: form.value.paid_amount_payment_ccy,
       paid_amount_invoice_ccy: form.value.paid_amount_invoice_ccy,
       exchange_diff_base: form.value.exchange_diff_base,
+      expense_category_id: form.value.expense_category_id,
       items: form.value.items.map((it, i) => ({
         description: it.description,
         quantity: Number(it.quantity || 0),
@@ -647,6 +655,27 @@ function fieldErr(key: string): string | null {
           @update:paid-amount-invoice-ccy="(v) => form.paid_amount_invoice_ccy = v"
           @update:exchange-diff-base="(v) => form.exchange_diff_base = v"
         />
+      </div>
+
+      <!-- Box: Klasifikace (kategorie nákladů + VAT klasifikace v dalším commitu) -->
+      <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
+        <h2 class="text-sm font-medium text-neutral-700 mb-3">{{ t('purchase_invoice.classification.title') }}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-neutral-500 mb-1">{{ t('purchase_invoice.classification.expense_category') }}</label>
+            <select v-model="form.expense_category_id" class="w-full h-10 px-3 border border-neutral-300 rounded-md bg-white text-sm">
+              <option :value="null">— {{ t('purchase_invoice.classification.no_category') }} —</option>
+              <option v-for="c in expenseCategories" :key="c.id" :value="c.id">
+                {{ c.label }} <span class="text-neutral-400">({{ c.code }})</span>
+              </option>
+            </select>
+            <p class="text-xs text-neutral-500 mt-1">
+              <RouterLink to="/admin/codebooks" class="text-primary-600 hover:underline">
+                {{ t('purchase_invoice.classification.manage_categories') }}
+              </RouterLink>
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Box 4: Poznámky -->

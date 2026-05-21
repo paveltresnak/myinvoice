@@ -202,6 +202,12 @@
       "currency_required": "Vyber měnu faktury.",
       "items_required": "Přidej alespoň jednu položku."
     },
+    "classification": {
+      "title": "Klasifikace",
+      "expense_category": "Kategorie nákladu",
+      "no_category": "(bez kategorie)",
+      "manage_categories": "Spravovat kategorie v Číselnících →"
+    },
     "bulk": {
       "mark_booked": "Označit zaúčtováno ({n})",
       "mark_paid": "Označit zaplaceno ({n})",
@@ -1227,11 +1233,31 @@
     "edit_currency_label_full": "Editace měny: {label}",
     "account_label_form": "Název účtu (label)"
   },
+  "expense_categories": {
+    "hint": "Kategorie nákladů přijatých faktur — slouží pro rozpad v CRM dashboardu.",
+    "empty": "Žádné kategorie. Vytvoř první a přiřaď na přijaté faktury pro lepší přehled nákladů.",
+    "new": "Nová kategorie",
+    "new_title": "Nová kategorie nákladů",
+    "edit_title": "Úprava kategorie",
+    "code": "Kód",
+    "code_hint": "Krátký identifikátor (A-Z, 0-9, _, -), např. \"hosting\", \"software\"",
+    "label": "Název",
+    "fixed_or_var": "Typ",
+    "fixed": "Fixní",
+    "variable": "Variabilní",
+    "display_order": "Pořadí (řazení)",
+    "usage": "Použití",
+    "archive": "Archivovat (skrýt z pickerů)",
+    "archived": "Archivováno",
+    "archived_due_to_usage": "Kategorie už je použitá — archivována (skryta z pickerů, ale zachová historii).",
+    "delete_confirm": "Smazat kategorii „{label}\"? Pokud je už použitá, jen ji archivuji."
+  },
   "codebooks": {
     "title": "Číselníky",
     "subtitle": "Měny + bankovní účty, sazby DPH, země, jednotky. Pouze pro admin.",
     "tab_currencies": "Měny",
     "tab_vat": "Sazby DPH",
+    "tab_expense_categories": "Kategorie nákladů",
     "tab_countries": "Země",
     "tab_units": "Jednotky",
     "new_currency": "Nová měna",

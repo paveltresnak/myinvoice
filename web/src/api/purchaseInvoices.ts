@@ -104,6 +104,7 @@ export interface PurchaseInvoice {
   pdf_original_name: string | null
   pdf_uploaded_at: string | null
   vat_classification_code: string | null
+  expense_category_id: number | null
   created_by: number
   created_at: string
   updated_at: string
@@ -184,6 +185,7 @@ export interface PurchaseInvoicePayload {
   paid_amount_invoice_ccy?: number | null
   exchange_diff_base?: number | null
   vat_classification_code?: string | null
+  expense_category_id?: number | null
   items: Array<{
     description: string
     quantity: number

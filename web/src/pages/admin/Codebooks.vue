@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, type VatRate, type Country, type CurrencyAccount, type Unit } from '@/api/settings'
 import { suppliersApi, type SupplierListItem, type SupplierCreatePayload } from '@/api/suppliers'
+import { expenseCategoriesApi, type ExpenseCategory } from '@/api/expenseCategories'
 import { clientsApi } from '@/api/clients'
 import { useSupplierStore } from '@/stores/supplier'
 import { useAuthStore } from '@/stores/auth'
@@ -14,7 +15,7 @@ const toast = useToast()
 const supplierStore = useSupplierStore()
 const auth = useAuthStore()
 
-type Tab = 'suppliers' | 'currencies' | 'vat' | 'countries' | 'units'
+type Tab = 'suppliers' | 'currencies' | 'vat' | 'countries' | 'units' | 'expense_categories'
 const tab = ref<Tab>('suppliers')
 
 const currencies = ref<CurrencyAccount[]>([])
@@ -299,6 +300,72 @@ async function deleteCountry(c: Country) {
     toast.error(e?.response?.data?.error?.message || t('common.error'))
   }
 }
+
+// ─── Expense categories (kategorie nákladů pro CRM rozpad) ─────────────
+const expenseCategories = ref<ExpenseCategory[]>([])
+const expenseDraft = reactive({
+  id: 0,
+  code: '',
+  label: '',
+  fixed_or_var: 'variable' as 'fixed' | 'variable',
+  display_order: 0,
+  archived: false,
+})
+const expenseOpen = ref(false)
+
+async function loadExpenseCategories() {
+  expenseCategories.value = await expenseCategoriesApi.list(true)
+}
+
+function newExpense() {
+  Object.assign(expenseDraft, { id: 0, code: '', label: '', fixed_or_var: 'variable', display_order: 0, archived: false })
+  expenseOpen.value = true
+}
+
+function editExpense(c: ExpenseCategory) {
+  Object.assign(expenseDraft, c)
+  expenseOpen.value = true
+}
+
+async function saveExpense() {
+  try {
+    if (expenseDraft.id) {
+      await expenseCategoriesApi.update(expenseDraft.id, {
+        code: expenseDraft.code,
+        label: expenseDraft.label,
+        fixed_or_var: expenseDraft.fixed_or_var,
+        display_order: expenseDraft.display_order,
+        archived: expenseDraft.archived,
+      })
+    } else {
+      await expenseCategoriesApi.create({
+        code: expenseDraft.code,
+        label: expenseDraft.label,
+        fixed_or_var: expenseDraft.fixed_or_var,
+        display_order: expenseDraft.display_order,
+      })
+    }
+    expenseOpen.value = false
+    toast.success(t('common.saved'))
+    await loadExpenseCategories()
+  } catch (e: any) {
+    toast.error(e?.response?.data?.error?.message || t('common.error'))
+  }
+}
+
+async function removeExpense(c: ExpenseCategory) {
+  if (!confirm(t('expense_categories.delete_confirm', { label: c.label }))) return
+  try {
+    const r = await expenseCategoriesApi.delete(c.id)
+    toast.success(r.deleted ? t('common.deleted') : t('expense_categories.archived_due_to_usage'))
+    await loadExpenseCategories()
+  } catch (e: any) {
+    toast.error(e?.response?.data?.error?.message || t('common.error'))
+  }
+}
+
+// Načti při přepnutí na tab=expense_categories
+watch(tab, (newTab) => { if (newTab === 'expense_categories') loadExpenseCategories() })
 </script>
 
 <template>
@@ -310,7 +377,7 @@ async function deleteCountry(c: Country) {
 
     <!-- Tabs — Dodavatelé jako první volba (multi-tenant firmy embed do Codebooks) -->
     <div class="border-b border-neutral-200 mb-4 flex gap-1 overflow-x-auto">
-      <button v-for="tt in (['suppliers', 'currencies', 'vat', 'countries', 'units'] as const)" :key="tt"
+      <button v-for="tt in (['suppliers', 'currencies', 'vat', 'expense_categories', 'countries', 'units'] as const)" :key="tt"
         @click="tab = tt"
         class="cursor-pointer px-4 py-2 text-sm border-b-2 transition whitespace-nowrap"
         :class="tab === tt
@@ -319,6 +386,7 @@ async function deleteCountry(c: Country) {
         {{ tt === 'suppliers' ? t('nav.suppliers')
           : tt === 'currencies' ? t('codebooks.tab_currencies')
           : tt === 'vat' ? t('codebooks.tab_vat')
+          : tt === 'expense_categories' ? t('codebooks.tab_expense_categories')
           : tt === 'countries' ? t('codebooks.tab_countries')
           : t('codebooks.tab_units') }}
       </button>
@@ -655,7 +723,7 @@ async function deleteCountry(c: Country) {
     </section>
 
     <!-- ====== UNITS ====== -->
-    <section v-else>
+    <section v-else-if="tab === 'units'">
       <div class="flex justify-end mb-3">
         <button @click="newUnit"
           class="cursor-pointer h-9 px-3 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md inline-flex items-center gap-1.5">
@@ -721,7 +789,102 @@ async function deleteCountry(c: Country) {
       </div>
     </section>
 
+    <!-- ====== EXPENSE CATEGORIES ====== -->
+    <section v-else-if="tab === 'expense_categories'">
+      <div class="flex justify-between mb-3 gap-2">
+        <p class="text-sm text-neutral-500">{{ t('expense_categories.hint') }}</p>
+        <button @click="newExpense"
+          class="cursor-pointer h-9 px-3 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          {{ t('expense_categories.new') }}
+        </button>
+      </div>
+
+      <div v-if="expenseCategories.length === 0" class="bg-white border border-dashed border-neutral-300 rounded-lg p-8 text-center text-sm text-neutral-500">
+        {{ t('expense_categories.empty') }}
+      </div>
+
+      <div v-else class="bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-neutral-50 text-xs text-neutral-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-3 py-2 text-left font-medium w-24">{{ t('expense_categories.code') }}</th>
+              <th class="px-3 py-2 text-left font-medium">{{ t('expense_categories.label') }}</th>
+              <th class="px-3 py-2 text-center font-medium w-24">{{ t('expense_categories.fixed_or_var') }}</th>
+              <th class="px-3 py-2 text-right font-medium w-24">{{ t('expense_categories.usage') }}</th>
+              <th class="px-3 py-2 w-40"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            <tr v-for="c in expenseCategories" :key="c.id" :class="['hover:bg-neutral-50', c.archived ? 'opacity-50' : '']">
+              <td class="px-3 py-2 font-mono text-xs">{{ c.code }}</td>
+              <td class="px-3 py-2">
+                {{ c.label }}
+                <span v-if="c.archived" class="ml-2 text-xs px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500">{{ t('expense_categories.archived') }}</span>
+              </td>
+              <td class="px-3 py-2 text-center text-xs">
+                <span :class="c.fixed_or_var === 'fixed' ? 'text-primary-700' : 'text-warning-600'">
+                  {{ c.fixed_or_var === 'fixed' ? t('expense_categories.fixed') : t('expense_categories.variable') }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-right font-mono text-xs text-neutral-600">{{ c.purchases_count || 0 }}</td>
+              <td class="px-3 py-2 text-right text-xs">
+                <button @click="editExpense(c)" class="cursor-pointer text-primary-600 hover:text-primary-700 mr-3">
+                  {{ t('common.edit') }}
+                </button>
+                <button @click="removeExpense(c)" class="cursor-pointer text-danger-500 hover:text-danger-600">
+                  {{ t('common.delete') }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ====== Modals ====== -->
+
+    <!-- Expense category modal -->
+    <div v-if="expenseOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-5">
+        <h3 class="text-lg font-semibold mb-3">
+          {{ expenseDraft.id ? t('expense_categories.edit_title') : t('expense_categories.new_title') }}
+        </h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('expense_categories.code') }} *</label>
+            <input v-model="expenseDraft.code" type="text" maxlength="20" placeholder="hosting"
+              class="w-full h-10 px-3 border border-neutral-300 rounded-md text-sm font-mono" />
+            <p class="text-xs text-neutral-500 mt-1">{{ t('expense_categories.code_hint') }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('expense_categories.label') }} *</label>
+            <input v-model="expenseDraft.label" type="text" maxlength="100" placeholder="Hosting a domény"
+              class="w-full h-10 px-3 border border-neutral-300 rounded-md text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('expense_categories.fixed_or_var') }}</label>
+            <select v-model="expenseDraft.fixed_or_var" class="w-full h-10 px-3 border border-neutral-300 rounded-md bg-white text-sm">
+              <option value="variable">{{ t('expense_categories.variable') }}</option>
+              <option value="fixed">{{ t('expense_categories.fixed') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('expense_categories.display_order') }}</label>
+            <input v-model.number="expenseDraft.display_order" type="number" step="1"
+              class="w-full h-10 px-3 border border-neutral-300 rounded-md text-sm" />
+          </div>
+          <label v-if="expenseDraft.id" class="flex items-center gap-2 text-sm">
+            <input v-model="expenseDraft.archived" type="checkbox" class="rounded border-neutral-300 text-primary-600" />
+            {{ t('expense_categories.archive') }}
+          </label>
+        </div>
+        <div class="flex justify-end gap-2 pt-4 mt-3 border-t border-neutral-200">
+          <button @click="expenseOpen = false" class="cursor-pointer px-3 h-9 text-sm border border-neutral-300 rounded-md hover:bg-neutral-50">{{ t('common.cancel') }}</button>
+          <button @click="saveExpense" class="cursor-pointer px-4 h-9 text-sm bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-md">{{ t('common.save') }}</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Supplier create modal (multi-tenant firma) -->
     <div v-if="supplierCreateOpen" class="fixed inset-0 bg-neutral-900/40 z-50 flex items-center justify-center p-4">

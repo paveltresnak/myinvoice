@@ -63,22 +63,42 @@ export function evalMath(input: string): number | null {
  */
 export const vMath: Directive<HTMLInputElement> = {
   mounted(el) {
-    const handler = () => {
+    const evaluate = () => {
       const r = evalMath(el.value)
       if (r === null) return
       const formatted = String(r)
       if (el.value === formatted) return
       el.value = formatted
+      // Dispatch events s `bubbles: true` — Vue v-model interní listener
+      // je registrovaný na el (capture během mounted), takže input event tam
+      // doletí a v-model.number ho parsuje na Number().
       el.dispatchEvent(new Event('input', { bubbles: true }))
       el.dispatchEvent(new Event('change', { bubbles: true }))
     }
-    el.addEventListener('blur', handler)
+
+    // 1) Blur — primární trigger (Tab i mouseclick mimo pole)
+    el.addEventListener('blur', evaluate)
+
+    // 2) Enter — power-user shortcut
     el.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter') {
-        handler()
+      const ev = e as KeyboardEvent
+      if (ev.key === 'Enter' || ev.key === 'Tab') {
+        evaluate()
       }
     })
-    ;(el as any).__mathHandler = handler
+
+    // 3) Debounced input — pokud user přestane psát na 800ms a obsah vypadá
+    //    jako výraz (obsahuje +, -, *, / mimo začátek), zkus evaluate.
+    let timeout: ReturnType<typeof setTimeout> | null = null
+    el.addEventListener('input', () => {
+      if (timeout) clearTimeout(timeout)
+      const v = el.value
+      // Trigger jen pokud obsahuje operátor (kromě leading minus pro záporná čísla)
+      if (!/[+*/]|.\-/.test(v)) return
+      timeout = setTimeout(evaluate, 800)
+    })
+
+    ;(el as any).__mathHandler = evaluate
   },
   beforeUnmount(el) {
     const h = (el as any).__mathHandler

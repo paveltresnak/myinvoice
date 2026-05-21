@@ -202,6 +202,12 @@
       "currency_required": "Select invoice currency.",
       "items_required": "Add at least one item."
     },
+    "classification": {
+      "title": "Classification",
+      "expense_category": "Expense category",
+      "no_category": "(no category)",
+      "manage_categories": "Manage categories in Codebooks →"
+    },
     "bulk": {
       "mark_booked": "Mark booked ({n})",
       "mark_paid": "Mark paid ({n})",
@@ -1227,11 +1233,31 @@
     "edit_currency_label_full": "Edit currency: {label}",
     "account_label_form": "Account name (label)"
   },
+  "expense_categories": {
+    "hint": "Expense categories for received invoices — used for breakdown in CRM dashboard.",
+    "empty": "No categories. Create first and assign to received invoices for better cost insight.",
+    "new": "New category",
+    "new_title": "New expense category",
+    "edit_title": "Edit category",
+    "code": "Code",
+    "code_hint": "Short ID (A-Z, 0-9, _, -), e.g. \"hosting\", \"software\"",
+    "label": "Label",
+    "fixed_or_var": "Type",
+    "fixed": "Fixed",
+    "variable": "Variable",
+    "display_order": "Order (sorting)",
+    "usage": "Usage",
+    "archive": "Archive (hide from pickers)",
+    "archived": "Archived",
+    "archived_due_to_usage": "Category is in use — archived (hidden from pickers, history preserved).",
+    "delete_confirm": "Delete category \"{label}\"? If already used, will be archived instead."
+  },
   "codebooks": {
     "title": "Codebooks",
     "subtitle": "Currencies + bank accounts, VAT rates, countries, units. Admin only.",
     "tab_currencies": "Currencies",
     "tab_vat": "VAT rates",
+    "tab_expense_categories": "Expense categories",
     "tab_countries": "Countries",
     "tab_units": "Units",
     "new_currency": "New currency",
