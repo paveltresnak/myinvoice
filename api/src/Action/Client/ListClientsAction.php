@@ -21,9 +21,14 @@ final class ListClientsAction
     public function __invoke(Request $request, Response $response): Response
     {
         $q = $request->getQueryParams();
+        $role = (string) ($q['role'] ?? 'all');
+        if (!in_array($role, ['all', 'customers', 'vendors'], true)) {
+            $role = 'all';
+        }
         $filters = [
             'q'           => isset($q['q']) ? trim((string) $q['q']) : '',
             'archived'    => !empty($q['filter']['archived']),
+            'role'        => $role,
             'supplier_id' => (int) $request->getAttribute(SupplierScopeMiddleware::ATTR_CURRENT_ID, 0),
         ];
         $page = max(1, (int) ($q['page'] ?? 1));

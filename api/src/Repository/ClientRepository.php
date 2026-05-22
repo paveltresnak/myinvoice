@@ -41,6 +41,16 @@ final class ClientRepository
         } else {
             $where[] = 'c.archived_at IS NULL';
         }
+        // Role filter — backend-side aby paginace + total counter byly korektní.
+        // Frontend dříve filtroval client-side, ale to dávalo špatné "X z Y" (vendors 15 z 15
+        // i když jich je 45) — filtroval jen načtenou stránku, ne celou tabulku.
+        $role = (string) ($filters['role'] ?? 'all');
+        if ($role === 'vendors') {
+            $where[] = 'c.is_vendor = 1';
+        } elseif ($role === 'customers') {
+            // is_customer default 1 v migraci 0026a — explicit !=0 pokrývá i historická data.
+            $where[] = 'c.is_customer <> 0';
+        }
         if (!empty($filters['q'])) {
             // Escape % a _ wildcards aby uživatelský input nedělal slow-query DoS / nečekanou shodu
             $q = addcslashes((string) $filters['q'], '%_\\');
@@ -55,6 +65,27 @@ final class ClientRepository
         $stmt = $this->db->pdo()->prepare("SELECT COUNT(*) FROM clients c WHERE $whereSql");
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
+
+        // Role counts pro tab badge (bez stránkování, bez role-filtru, ale se zbylými filtry
+        // jako archived + q + supplier_id). UI ukáže "Klienti (X) | Dodavatelé (Y) | Vše (Z)".
+        $whereForCounts = $where;
+        $paramsForCounts = $params;
+        // Odstranit role-podmínku z whereForCounts (je v něm jako 'c.is_vendor = 1' apod.)
+        $whereForCounts = array_values(array_filter(
+            $whereForCounts,
+            fn ($w) => $w !== 'c.is_vendor = 1' && $w !== 'c.is_customer <> 0'
+        ));
+        $whereCountsSql = implode(' AND ', $whereForCounts);
+        $stmtCounts = $this->db->pdo()->prepare(
+            "SELECT
+                SUM(CASE WHEN c.is_customer <> 0 THEN 1 ELSE 0 END) AS customers,
+                SUM(CASE WHEN c.is_vendor   =  1 THEN 1 ELSE 0 END) AS vendors,
+                COUNT(*) AS all_clients
+             FROM clients c
+            WHERE $whereCountsSql"
+        );
+        $stmtCounts->execute($paramsForCounts);
+        $roleCounts = $stmtCounts->fetch(PDO::FETCH_ASSOC) ?: ['customers' => 0, 'vendors' => 0, 'all_clients' => 0];
 
         // Whitelist řazení (defense proti SQLi přes user input)
         $orderBy = match ($sort) {
@@ -121,6 +152,11 @@ final class ClientRepository
                 'page'     => $page,
                 'per_page' => $perPage,
                 'pages'    => (int) ceil($total / $perPage),
+                'role_counts' => [
+                    'all'       => (int) $roleCounts['all_clients'],
+                    'customers' => (int) $roleCounts['customers'],
+                    'vendors'   => (int) $roleCounts['vendors'],
+                ],
             ],
         ];
     }

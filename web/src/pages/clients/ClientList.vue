@@ -35,22 +35,13 @@ watch(() => route.query.role, () => {
 })
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Klient-side role filter (backend zatím vrací všechny; přepsání na server-side filter
-// je TODO, kdy bude víc dat).
-const filteredItems = computed(() => {
-  if (roleFilter.value === 'all') return items.value
-  return items.value.filter(c => {
-    if (roleFilter.value === 'vendors')   return c.is_vendor   === true
-    if (roleFilter.value === 'customers') return c.is_customer !== false  // default true pro existující data
-    return true
-  })
-})
+// Server-side role filter — backend respektuje cfg.php pagination.clients_per_page
+// a vrací meta.role_counts pro tab badge. Frontend žádný client-side filter neaplikuje.
+const filteredItems = computed(() => items.value)
 
-const roleCounts = computed(() => ({
-  all:       items.value.length,
-  customers: items.value.filter(c => c.is_customer !== false).length,
-  vendors:   items.value.filter(c => c.is_vendor   === true).length,
-}))
+const roleCounts = ref<{ all: number; customers: number; vendors: number }>({
+  all: 0, customers: 0, vendors: 0,
+})
 
 async function load(reset = true) {
   if (reset) {
@@ -65,6 +56,7 @@ async function load(reset = true) {
       q: search.value,
       archived: showArchived.value,
       sort: sort.value,
+      role: roleFilter.value,
       page: page.value,
     })
     if (reset) {
@@ -74,6 +66,9 @@ async function load(reset = true) {
     }
     total.value = r.meta.total
     pages.value = r.meta.pages
+    if (r.meta.role_counts) {
+      roleCounts.value = r.meta.role_counts
+    }
   } finally {
     loading.value = false
     loadingMore.value = false
@@ -83,6 +78,7 @@ async function load(reset = true) {
 onMounted(() => load(true))
 watch(showArchived, () => load(true))
 watch(sort, () => load(true))
+watch(roleFilter, () => load(true))
 watch(search, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => load(true), 300)
@@ -271,7 +267,7 @@ function openClient(c: Client) {
       </div>
 
       <div v-if="items.length" class="px-4 py-3 border-t border-neutral-200 flex items-center justify-between text-sm">
-        <span class="text-neutral-500">{{ t('common.loaded_count', { loaded: filteredItems.length, total: roleCounts[roleFilter] }) }}</span>
+        <span class="text-neutral-500">{{ t('common.loaded_count', { loaded: filteredItems.length, total: total }) }}</span>
         <button v-if="page < pages" @click="load(false)" :disabled="loadingMore"
           class="cursor-pointer h-9 px-4 text-sm bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50 rounded-md inline-flex items-center gap-1.5">
           {{ loadingMore ? t('common.loading_more') : t('common.load_more') }}

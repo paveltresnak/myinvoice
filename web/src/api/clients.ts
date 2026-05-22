@@ -117,15 +117,29 @@ export interface ListResponse<T> {
   meta: { total: number; page: number; per_page: number; pages: number }
 }
 
+export interface ClientListResponse {
+  data: Client[]
+  meta: {
+    total: number
+    page: number
+    per_page: number
+    pages: number
+    role_counts?: { all: number; customers: number; vendors: number }
+  }
+}
+
+export type ClientRoleFilter = 'all' | 'customers' | 'vendors'
+
 export const clientsApi = {
-  list: (params?: { q?: string; page?: number; per_page?: number; archived?: boolean; sort?: 'name' | 'revenue' | 'last_activity' }) =>
+  list: (params?: { q?: string; page?: number; per_page?: number; archived?: boolean; role?: ClientRoleFilter; sort?: 'name' | 'revenue' | 'last_activity' }) =>
     api
-      .get<ListResponse<Client>>('/clients', {
+      .get<ClientListResponse>('/clients', {
         params: {
           q: params?.q || undefined,
           page: params?.page,
           per_page: params?.per_page,
           sort: params?.sort,
+          role: params?.role && params.role !== 'all' ? params.role : undefined,
           ...(params?.archived ? { 'filter[archived]': 1 } : {}),
         },
       })
