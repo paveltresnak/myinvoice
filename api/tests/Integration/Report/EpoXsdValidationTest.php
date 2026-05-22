@@ -31,11 +31,16 @@ final class EpoXsdValidationTest extends TestCase
 
     protected function setUp(): void
     {
-        // Defensive soft-skip: pokud někdo XSD smazal, neházíme fatal. Standardně XSD
-        // jsou commitnuté v api/xsd/ (MFČR public schémata), takže skip nikdy nefiruje.
-        // Skip MUSÍ proběhnout PŘED Bootstrap::buildApp() — ten potřebuje cfg.php (gitignored
-        // v CI runneru) a způsobil by fatal v setUp ještě před skip-check uvnitř testů.
-        $xsdDir = dirname(__DIR__, 4) . '/api/xsd';
+        // Soft-skip: test je Integration (vyžaduje DB s reálnými fakturami + cfg.php
+        // pro DB connection). V CI runneru (GitHub Actions) cfg.php neexistuje (je
+        // gitignored), takže skipujeme — Bootstrap::buildApp() by jinak fatalně padl.
+        // Defenzivně skipujeme i pokud chybí XSD adresář (někdo smazal commitnutá schémata).
+        // Oba checky MUSÍ proběhnout PŘED Bootstrap::buildApp(), protože jinak fatal.
+        $rootDir = dirname(__DIR__, 4);
+        if (!is_file($rootDir . '/cfg.php')) {
+            $this->markTestSkipped('cfg.php neexistuje — test vyžaduje DB connection (CI runner skipne).');
+        }
+        $xsdDir = $rootDir . '/api/xsd';
         if (!is_dir($xsdDir) || count(glob($xsdDir . '/*.xsd') ?: []) === 0) {
             $this->markTestSkipped('Žádné XSD v api/xsd/ — chybí commitnutá schémata MFČR.');
         }
