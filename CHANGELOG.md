@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.2] — 2026-05-22
+
+Patch release zaměřený na bank matching (přepárování + ručně zaplacené faktury),
+opravu chybějící migrace pro `payment_matches`, paginaci-independentní agregaci
+nákladů v detailu klienta a několik UX drobností.
+
+### Added
+
+#### Přepárování bankovního výpisu
+- **`/bank/statements/{id}` nové tlačítko *Přepárovat výpis*** v hlavičce
+  seznamu transakcí. Užitečné, když uživatel doplní vystavenou/přijatou fakturu
+  ex-post (po importu výpisu) — místo párování po jedné transakci se znovu
+  spustí auto-match na všech `unmatched` + `auto_partial` transakcích výpisu.
+- Stávající `auto_exact`, `manual` a `ignored` zůstanou netknuté.
+- Backend: `POST /api/bank-statements/{id}/rematch`, audit log
+  `bank.statement_rematch` s počty (newly_matched / newly_partial / still_unmatched).
+
+#### Párování i ručně zaplacených faktur
+- Bank matcher dosud hledal jen mezi nezaplacenými fakturami. Pokud uživatel
+  označil fakturu jako zaplacenou ručně, transakce zůstávala visad ve výpisu
+  jako `unmatched`. Teď `StatementMatcher` zahrnuje i fakturu se `status='paid'`
+  — naváže transakci, ale **status a `paid_at` nepřepíše** (ručně nastavená
+  hodnota zůstává).
+- Pravidlo platí pro obě strany: vystavené (`invoices`) i přijaté
+  (`purchase_invoices`).
+
+### Changed
+
+- **Detail klienta — *Náklady po letech / měsících*** se počítají server-side
+  (`GetClientAction` přidal `costs_by_year` a `costs_by_month` jako mirror
+  k `revenue_by_year / month`). Dříve se agregace dělala v Vue z načtené první
+  stránky přijatých faktur — při `pagination.invoices_per_page=20` v `cfg.php`
+  rok s 11 fakturami zobrazil jen 3.
+- **Detail klienta — listing přijatých faktur** žádá `per_page=200` (backend
+  max), aby v detailu byly všechny faktury najednou. Vyřešen scénář
+  „v DB 28 faktur, UI ukazuje 20" u dodavatelů s víc fakturami než per-page.
+- **Admin → Integrations → AI**: lze uložit změnu výchozího Claude modelu, aniž
+  by uživatel musel znovu zadat API klíč. Dříve formulář vyžadoval `sk-ant-...`
+  i když byl input read-only kvůli existujícímu klíči.
+
+### Fixed
+
+#### Chybějící migrace `payment_matches`
+- Commit `c540d46` (fáze 3: bank matching pro přijaté faktury) v commit message
+  ohlásil migraci `0034_payment_matches`, ale soubor se omylem nedostal do gitu.
+  Tabulka existovala jen v lokálních DB (ručně vytvořená), na produkci chyběla
+  → `INSERT INTO payment_matches` při auto-match outgoing transakce padal.
+- Doplněno `db/migrations/0034_payment_matches.sql` (idempotentní
+  `CREATE TABLE IF NOT EXISTS`, projde i tam kde už tabulka je).
+
+#### Mazání klienta v roli vendor
+- `DELETE /api/clients/{id}` kontroloval jen vystavené faktury a zakázky.
+  Pokud byl klient v roli vendor s přijatými fakturami, vyhozený `RESTRICT`
+  z FK `purchase_invoices.vendor_id` skončil ošklivým 500.
+- Teď přidaná kontrola `purchase_invoices.vendor_id = ?` — friendly 409
+  „Klienta nelze smazat — má X vystavených, Y přijatých faktur a Z zakázek."
+
+### Earlier (commits od v4.0.1)
+- `feat(ai-import)`: rate-limit retry/throttle + live progress v cron skenu
+- `feat(ai-import)`: detekce dobropisu z PDF a záporné položky
+- `feat(dph)`: predikce DPH navázaná na zvolený měsíc/kvartál
+- `fix(tests)`: skip `EpoXsdValidationTest` v CI bez `cfg.php`
+- `docs(manual)`: refresh `01_dashboard.webp` screenshot
+
 ## [4.0.1] — 2026-05-22
 
 Patch release navazující na 4.0.0 — drobná vylepšení UX kolem multi-currency
