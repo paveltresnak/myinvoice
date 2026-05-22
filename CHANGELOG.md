@@ -7,6 +7,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.4] — 2026-05-22
+
+Velký funkční audit napříč projektem — opravy multi-currency rankingu, VAT
+klasifikace s NULL handlingem, KH XML schema mismatch, self-service změna
+hesla, AI vendor↔customer swap detekce, standalone Work Report modal a
+spousta UX vylepšení.
+
+### Added
+
+#### Self-service profil (heslo + 2FA)
+- Nová stránka `/profile/password` se záložkami **Heslo** + **2FA**.
+  Předtím šlo heslo měnit jen přes admin → users; účetní si ho nemohl změnit
+  vůbec.
+- Live validace: min 12 znaků (matches `PasswordHasher::MIN_LENGTH`), max 128,
+  match new ↔ confirm. Show/hide toggle, info hint o invalidaci ostatních
+  sessions.
+- 2FA záložka migrovaná z původního `/profile/totp` (redirect zachován pro BC).
+- Header link u jména uživatele → `/profile/password` (vedle TOTP odstraněn,
+  oba pod jedním klikem).
+- Tab badge „aktivní" když je TOTP zapnuté.
+
+#### Standalone Work Report modal
+- Nová komponenta `WorkReportModal.vue` otevíraná tlačítkem **„Výkaz"**:
+  - V detailu faktury (`InvoiceDetail.vue`): vedle Edit, viditelné pro draft +
+    workflow projekt NEBO již existující výkaz.
+  - V seznamu faktur (`InvoiceList.vue`): nahrazuje **KONCEPT** badge ve sloupci
+    Stav u relevantních drafů — rychlý přístup bez navigace na detail.
+- Editor řádků: description, work_date, hours, rate; live total per row + Σ
+  hodin a sumy.
+- ▲ / ▼ tlačítka pro přesun položek (mirror invoice items layout — vlevo).
+- Save flow: `PUT /api/invoices/{id}/work-report` (uloží WR) + `PUT
+  /api/invoices/{id}` (sync sumy do `invoice_items` jako jeden řádek se sumou).
+- Stejné šipky přidány i do plného editoru faktury (`InvoiceEditor.vue`).
+
+#### AI privacy notice
+- Admin → Integrations → AI: warning panel nahoře vysvětluje, že obsah PDF
+  (vč. citlivých dat) se odesílá na servery Anthropic (USA). Doporučení
+  ISDOC importu pro citlivé doklady.
+
+#### Footer odkaz na projekt
+- Sidebar footer: link „MyInvoice.cz" → `https://myinvoice.cz/` (vedle verze).
+
+#### Force-edit přijatých faktur i pro paid
+- Admin může s `?force=1` upravit i `paid` přijatou fakturu (dříve jen
+  received/booked). `cancelled` zůstává immutable.
+- Tlačítko *Upravit (force)* s `confirm()` varováním o riziku bank-match rozbití.
+
+### Changed
+
+#### Multi-currency CZK ranking (všude)
+Dosud řadily SUM agregace podle nepřepočtené částky napříč měnami — 1000 EUR
+ranked pod 20 000 CZK. Sjednocený fix přes `i.exchange_rate` /
+`pi.exchange_rate` (mirror Top klienti z 4.0.3):
+- **Project Stats** (`/stats` Top zakázky): `topProjects` + `topProjects12m`
+  přepočítávají na CZK, multi-currency projekt = 1 řádek.
+- **CRM Dashboard**: `expenseBreakdown` (kategorie nákladů — 100 EUR + 50 000
+  CZK už ne 50 100 nesmysl), `churnRisk` (klient v EUR + CZK jako jeden řádek).
+- TypeScript `TopClient`/`TopVendor`: nové `currencies?: string` pole, `currency`
+  vždy `'CZK'`.
+
+#### VAT klasifikace s NULL handling (KH/DPH)
+- `KontrolniHlaseniBuilder` INNER JOIN `vat_classifications` → LEFT JOIN.
+  Faktury bez explicit klasifikace dosud silently dropped ze sekcí A.1/B.1
+  (regulatory risk). Fallback: pokud chybí code, použij `i.reverse_charge` /
+  `pi.reverse_charge` flag.
+- `VatClassificationMapper` (DPH přiznání): auto-default code přes CASE WHEN
+  pokud chybí — z `reverse_charge` + `vat_rate_snapshot` (RC=20/5,
+  21%=1/40, 12%=2/41, 0%=3). Historická data + recent imports bez auto-classifier
+  už nepropadají DPH řádky.
+- GREATEST(tax_date, issue_date) → COALESCE (GREATEST dělalo NULL když tax_date
+  NULL, jako u sales faktur).
+
+#### Paginace + server-side filtry
+- **Pravidelné fakturace** (`/recurring`): paginace + load-more, status filter
+  server-side, `meta.status_counts` tab badges, `cfg.pagination.recurring_per_page`.
+- **Schvalovací inbox** (`/admin/approvals`): paginace + load-more, status
+  filter server-side.
+- **Klienti** (`/clients?role=vendors`): role filter SQL backend místo Vue,
+  `meta.role_counts`. Fix "15 z 15" pro 45 dodavatelů.
+- Menu link reset: klik na „Faktury"/„Přijaté faktury" na té samé stránce →
+  smaže filtry (předtím zůstávaly „zaseknuté").
+- Vendor sort role-aware: `/clients?role=vendors` „last_activity" řadí podle
+  `last_purchase_date`, „revenue" podle `costs` (dříve podle sales fields).
+
+#### UX detaily
+- **purchase-invoices/export** default `dateBy = 'issue'` (datum vystavení)
+  místo `'tax'` (DUZP) — uživatel typicky exportuje podle data na faktuře.
+- **Účetní role** vidí Exporty v menu PRODEJ + tax výkazy (Daň z příjmů,
+  Archív podání). Router `beforeEach` enforce `accountantOrAdmin` meta.
+- **formatMoney** respektuje per-currency decimals (JPY/HUF=0, BHD=3, ostatní 2)
+  místo hardcoded 2. Locale dynamicky z i18n (en → en-US, cs → cs-CZ).
+- **formatDate** lokalizovaný (předtím hardcoded cs-CZ pro všechny).
+
+### Fixed
+
+#### KH XML schema mismatch (regulatory)
+- `KontrolniHlaseniBuilder` generoval atributy, které neodpovídaly MFČR XSD
+  commitnuté v 4.0.1. Vygenerované KH XML by neprošlo validací při podání
+  na MFČR portále.
+- **VetaA1** (Přenesená daňová povinnost — dodavatel): `dppd` → `duzp`,
+  doplněn povinný `kod_pred_pl='5'` (obecný tuzemský RC; v budoucnu z
+  `vat_classifications.code` per faktura).
+- **VetaB2** (přijatá tuzemská nad 10 000 Kč): doplněny povinné `pomer='N'`
+  (poměrný odpočet podle §75) a `zdph_44='N'` (oprava nedobytné pohledávky).
+- EpoXsdValidationTest::testDphkh1PassesXsdValidation nyní prochází.
+
+#### AI extractor regression fixes
+- **vendor↔customer swap** detekce: AI občas zaměnil strany (tenant v
+  vendor pozici). Imports jsou vždy purchase faktury, takže pokud vendor.ic
+  == tenant.ic → swap zpět. Backfill skript `backfill-vendor-swap.php`
+  pro již zaimportované swap faktury.
+- **reverse_charge auto-detect** (AI i iDoklad): vendor je non-CZ A všechny
+  items vat_rate=0 → automaticky `reverse_charge=true`. Uživatel už nemusí
+  ručně zaškrtávat u EU faktur.
+
+#### DPH predikce: multi-currency drafts
+- `DphPriznaniAction::draftsPrediction` dosud používal `COALESCE(IF(cur='CZK',
+  1, i.exchange_rate), 1)` — drafty bez kurzu počítány 1:1 jako CZK.
+- Nyní fallback přes `exchange_rates` cache (CASE WHEN exchange_rate IS NULL):
+  dohledá se nejbližší ČNB kurz k DUZP, jen pokud cache prázdná pro danou měnu
+  spadne na 1.
+
+#### GetProjectAction `_czk` fieldy
+- `unpaid_summary` doplněn o `unpaid_total_czk` + `overdue_total_czk`
+  (mirror `GetClientAction`). Multi-currency projekt teď může v UI sečíst
+  CZK přes všechny měny.
+
+### Earlier (commits od v4.0.3)
+- `feat(invoices)`: Výkaz button v seznamu nahrazuje KONCEPT badge u draftů
+  s workflow / WR
+- `feat(work-report)`: tlačítka ↑↓ pro přesun položek (modal + editor)
+- `fix(work-report-modal)`: layout sumace pod tlačítkem „Přidat řádek",
+  whitespace-nowrap pro „4 500,00 CZK"
+- `fix(profile)`: sjednocená stránka `/profile/password` s tabs
+
 ## [4.0.3] — 2026-05-22
 
 Patch release: multi-currency CZK přepočet u Top klientů/dodavatelů (jak na
