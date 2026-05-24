@@ -1,0 +1,15 @@
+# Konfigurace s credentials — NIKDY necommitovat
+.env
+
+# Exportovaná data z Money (obsahují reálné faktury/kontakty)
+money-export*.json
+
+# Vygenerované / pracovní výstupy
+mi-kh/
+conv/
+*.log
+*.sql.gz
+
+# Python
+__pycache__/
+*.pyc
