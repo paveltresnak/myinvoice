@@ -59,12 +59,14 @@ final class VatLedgerService
      */
     public function classificationMap(int $supplierId): array
     {
+        // ORDER BY supplier_id IS NULL DESC → globální (NULL) řádky první, per-tenant
+        // override poslední → v loopu přepíše globální seed (per-tenant override VYHRAJE).
         $stmt = $this->db->pdo()->prepare(
             'SELECT code, label, dphdp3_line, dphdp3_line_secondary, kh_section, vat_rate, is_reverse_charge
                FROM vat_classifications
               WHERE (supplier_id IS NULL OR supplier_id = ?)
                 AND archived = 0
-           ORDER BY supplier_id IS NULL ASC, display_order ASC'
+           ORDER BY supplier_id IS NULL DESC, display_order ASC'
         );
         $stmt->execute([$supplierId]);
         $map = [];
@@ -91,7 +93,8 @@ final class VatLedgerService
                    COALESCE(i.tax_date, i.issue_date) AS tax_date, i.issue_date,
                    COALESCE(i.exchange_rate, 1) AS exchange_rate, COALESCE(cur.code, 'CZK') AS currency,
                    i.total_with_vat AS inv_total, i.reverse_charge AS rc_flag,
-                   c.company_name AS counterparty_name, c.dic AS counterparty_dic, co.iso2 AS country_iso2,
+                   c.company_name AS counterparty_name, c.dic AS counterparty_dic,
+                   co.iso2 AS country_iso2, COALESCE(co.is_eu, 0) AS country_is_eu,
                    0 AS is_fixed_asset,
                    COALESCE(
                        ii.vat_classification_code, i.vat_classification_code,
@@ -131,7 +134,8 @@ final class VatLedgerService
                    COALESCE(pi.tax_date, pi.issue_date) AS tax_date, pi.issue_date,
                    COALESCE(pi.exchange_rate, 1) AS exchange_rate, COALESCE(cur.code, 'CZK') AS currency,
                    pi.total_with_vat AS inv_total, pi.reverse_charge AS rc_flag,
-                   c.company_name AS counterparty_name, c.dic AS counterparty_dic, co.iso2 AS country_iso2,
+                   c.company_name AS counterparty_name, c.dic AS counterparty_dic,
+                   co.iso2 AS country_iso2, COALESCE(co.is_eu, 0) AS country_is_eu,
                    (CASE WHEN pii.is_fixed_asset = 1 OR pi.is_fixed_asset = 1 THEN 1 ELSE 0 END) AS is_fixed_asset,
                    COALESCE(
                        pii.vat_classification_code, pi.vat_classification_code,
@@ -193,6 +197,7 @@ final class VatLedgerService
             'counterparty_name'     => (string) ($r['counterparty_name'] ?? ''),
             'counterparty_dic'      => $r['counterparty_dic'] !== null ? (string) $r['counterparty_dic'] : null,
             'country_iso2'          => $r['country_iso2'] !== null ? strtoupper((string) $r['country_iso2']) : null,
+            'country_is_eu'         => (bool) $r['country_is_eu'],
             'description'           => (string) ($r['description'] ?? ''),
             'label'                 => $clsf['label'] ?? '',
             'code'                  => $code,

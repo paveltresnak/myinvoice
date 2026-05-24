@@ -292,20 +292,6 @@ final class DphPriznaniBuilder
     }
 
     /**
-     * Veta typ podle čísla řádku v DPHDP3.
-     * Řádky 1-26 (dodání) → Veta1
-     * Řádky 30-35 (sjednocené plnění) → Veta2
-     * Řádky 40-52 (odpočet) → Veta3
-     */
-    private function vetaTypeForLine(string $line): string
-    {
-        $n = (int) $line;
-        if ($n >= 40) return '3';
-        if ($n >= 30) return '2';
-        return '1';
-    }
-
-    /**
      * Formátování částky pro EPO XML — celé číslo Kč (zaokrouhleno).
      */
     private function formatAmount(float $amount): string

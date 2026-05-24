@@ -206,8 +206,8 @@ final class KontrolniHlaseniBuilder
         }
 
         // VetaC — rekapitulace plnění za období (obrat = uskutečněná, pln = přijatá).
-        // Sumace všech sekcí dohromady: A4+A5 (sales), B2+B3 (purchases), A1 (RC sales),
-        // B1 (RC purchases). A2 (EU acquisitions) zatím nepodporujeme → celk_zd_a2=0.
+        // Sumace všech sekcí: A4+A5 (sales), B2+B3 (purchases), A1 (RC sales),
+        // B1 (RC purchases), A2 (EU acquisitions → celk_zd_a2).
         $obrat23 = 0.0; $obrat5 = 0.0;
         foreach ($a4 as $r) { $obrat23 += (float) $r['base21']; $obrat5 += (float) $r['base12']; }
         $obrat23 += (float) ($a5['base21'] ?? 0); $obrat5 += (float) ($a5['base12'] ?? 0);
@@ -225,8 +225,6 @@ final class KontrolniHlaseniBuilder
         $vetaC->setAttribute('rez_pren23',   $this->formatAmount($rezPren23));
         // rez_pren5 = 0 záměrně: tuzemský reverse charge (§ 92a–92e — stavební práce,
         // odpad, zlato, …) je v ČR vždy v základní sazbě 21 %, snížená 12% RC neexistuje.
-        // Navíc vat_rate_snapshot je u RC plnění při uložení nulován (InvoiceCalculator),
-        // takže rozpad po sazbě stejně není zpětně dostupný.
         $vetaC->setAttribute('rez_pren5',    '0');
         // celk_zd_a2 = celkový základ pořízení zboží z JČS (sekce A.2)
         $celkA2 = 0.0;

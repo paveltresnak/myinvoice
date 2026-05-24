@@ -51,37 +51,6 @@ final class VatClassificationMapper
         }, $stmt->fetchAll(\PDO::FETCH_ASSOC));
     }
 
-    /**
-     * Vrátí mapu code → {label, direction, dphdp3_line, kh_section, vat_rate, is_reverse_charge}
-     *
-     * @return array<string, array{label:string, direction:string, dphdp3_line:?string,
-     *                              kh_section:?string, vat_rate:?float, is_reverse_charge:bool}>
-     */
-    public function loadMap(int $supplierId): array
-    {
-        $stmt = $this->db->pdo()->prepare(
-            'SELECT code, label, direction, dphdp3_line, dphdp3_line_secondary,
-                    kh_section, vat_rate, is_reverse_charge
-               FROM vat_classifications
-              WHERE (supplier_id IS NULL OR supplier_id = ?)
-                AND archived = 0
-           ORDER BY supplier_id IS NULL ASC, display_order ASC'
-        );
-        $stmt->execute([$supplierId]);
-        $map = [];
-        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
-            $map[(string) $r['code']] = [
-                'label'                 => (string) $r['label'],
-                'direction'             => (string) $r['direction'],
-                'dphdp3_line'           => $r['dphdp3_line'] !== null ? (string) $r['dphdp3_line'] : null,
-                'dphdp3_line_secondary' => $r['dphdp3_line_secondary'] !== null ? (string) $r['dphdp3_line_secondary'] : null,
-                'kh_section'            => $r['kh_section'] !== null ? (string) $r['kh_section'] : null,
-                'vat_rate'              => $r['vat_rate'] !== null ? (float) $r['vat_rate'] : null,
-                'is_reverse_charge'     => (bool) $r['is_reverse_charge'],
-            ];
-        }
-        return $map;
-    }
 
     /**
      * Aggregace pro DPH přiznání DPHDP3 — vrátí summary per řádek výkazu.

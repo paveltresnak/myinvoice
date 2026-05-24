@@ -43,7 +43,10 @@ final class SouhrnneHlaseniBuilder
         '22' => '2',  // poskytnutí služby
     ];
 
-    public function __construct(private readonly Connection $db) {}
+    public function __construct(
+        private readonly Connection $db,
+        private readonly VatLedgerService $ledger,
+    ) {}
 
     /**
      * @return array{xml: string, summary: array<string,mixed>, warnings: list<string>}
@@ -159,45 +162,20 @@ final class SouhrnneHlaseniBuilder
      */
     private function collectEuSupplies(int $supplierId, string $start, string $end): array
     {
-        // VAT klasifikační kódy pro EU (sale): 20, 21, 22. Plně parameterized
-        // přes IN(?,?,?) placeholders — žádné string concatenation, defensive
-        // i pro budoucí rozšíření o custom kódy.
-        $codeKeys = array_map('strval', array_keys(self::VAT_CODE_TO_SH_TYPE));
-        $placeholders = implode(',', array_fill(0, count($codeKeys), '?'));
-
-        $sql = "
-            SELECT cnt.iso2 AS country_iso2,
-                   c.dic AS dic_raw,
-                   c.company_name AS counterparty_name,
-                   COALESCE(ii.vat_classification_code, i.vat_classification_code) AS vat_code,
-                   SUM(COALESCE(ii.total_without_vat, 0)) AS amount,
-                   COUNT(DISTINCT i.id) AS inv_count
-              FROM invoices i
-              JOIN clients c    ON c.id = i.client_id
-              JOIN countries cnt ON cnt.id = c.country_id
-              JOIN invoice_items ii ON ii.invoice_id = i.id
-             WHERE i.supplier_id = ?
-               AND i.status NOT IN ('draft', 'cancelled')
-               AND i.invoice_type != 'proforma'
-               AND COALESCE(i.tax_date, i.issue_date) BETWEEN ? AND ?
-               AND cnt.is_eu = 1
-               AND cnt.iso2 != 'CZ'
-               AND c.dic IS NOT NULL AND c.dic != ''
-               AND COALESCE(ii.vat_classification_code, i.vat_classification_code) IN ({$placeholders})
-          GROUP BY cnt.iso2, c.dic, c.company_name, vat_code
-          ORDER BY cnt.iso2, c.dic
-        ";
-        $stmt = $this->db->pdo()->prepare($sql);
-        $stmt->execute([$supplierId, $start, $end, ...$codeKeys]);
-        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        // Konsolidace: pokud má klient 2 řádky se stejným vat_code (shouldn't happen po GROUP BY,
-        // ale po normalizaci DIČ se může stát např. SK1234 vs 1234), GROUP BY post-process.
+        // Projekce kanonických řádků (VatLedgerService) — vystavená EU B2B plnění:
+        // kód 20/21/22, EU země (≠ CZ) s DIČ. base_czk je už PŘEPOČTENÝ na CZK kurzem
+        // faktury (oprava staré chyby — SH dříve sčítalo total_without_vat v cizí měně).
         $result = [];
-        foreach ($rows as $r) {
-            $vatId = $this->normalizeVatId((string) $r['dic_raw'], (string) $r['country_iso2']);
+        foreach ($this->ledger->rows($supplierId, $start, $end, includeDrafts: false) as $r) {
+            if ($r['source'] !== 'sale') continue;
+            $code = $r['code'];
+            if ($code === null || !isset(self::VAT_CODE_TO_SH_TYPE[$code])) continue;
+            if (!$r['country_is_eu'] || $r['country_iso2'] === 'CZ' || $r['country_iso2'] === null) continue;
+
+            $vatId = $this->normalizeVatId((string) ($r['counterparty_dic'] ?? ''), (string) $r['country_iso2']);
             if ($vatId === '') continue; // bez DIČ nelze podat SH
-            $shType = self::VAT_CODE_TO_SH_TYPE[$r['vat_code']] ?? '0';
+
+            $shType = self::VAT_CODE_TO_SH_TYPE[$code];
             $key = "{$r['country_iso2']}|{$vatId}|{$shType}";
             if (!isset($result[$key])) {
                 $result[$key] = [
@@ -207,12 +185,19 @@ final class SouhrnneHlaseniBuilder
                     'amount'            => 0.0,
                     'count'             => 0,
                     'counterparty_name' => (string) $r['counterparty_name'],
+                    '_invoice_ids'      => [],
                 ];
             }
-            $result[$key]['amount'] += (float) $r['amount'];
-            $result[$key]['count']  += (int) $r['inv_count'];
+            $result[$key]['amount'] += (float) $r['base_czk'];
+            // Počet plnění = počet DISTINCT faktur (řádky jsou per-položka).
+            $result[$key]['_invoice_ids'][(int) $r['invoice_id']] = true;
         }
-        return array_values($result);
+        // Finalizace: count = počet distinct faktur, odstranit pomocné pole.
+        return array_map(static function (array $row): array {
+            $row['count'] = count($row['_invoice_ids']);
+            unset($row['_invoice_ids']);
+            return $row;
+        }, array_values($result));
     }
 
     /**

@@ -141,6 +141,28 @@ final class VatClassificationMapperTest extends TestCase
         $this->assertSame([], $lines, 'Drafty se do DPHDP3 nezapočítávají');
     }
 
+    public function testPerTenantOverrideWinsOverGlobal(): void
+    {
+        // Globální kód 40 → ř.40. Per-tenant override (supplier 1) ho přemapuje na ř.41.
+        // Override MUSÍ vyhrát (ORDER BY supplier_id IS NULL DESC → tenant zapsán poslední).
+        $this->pdo->exec("INSERT INTO vat_classifications
+            (supplier_id, code, label, direction, dphdp3_line, dphdp3_line_secondary,
+             kh_section, vat_rate, is_reverse_charge, display_order, archived)
+            VALUES (1, '40', 'Override 40→41', 'purchase', '41', NULL, 'B.2', 21.0, 0, 0, 0)");
+        $this->insertPurchaseInvoice(
+            id: 5, supplierId: 1, vendorId: 200, issueDate: '2026-05-15', taxDate: '2026-05-15',
+            currencyCode: 'CZK', exchangeRate: 1.0, reverseCharge: 0, classCode: '40', isFixedAsset: 0,
+        );
+        $this->insertPurchaseInvoiceItem(
+            id: 5, invoiceId: 5, base: 1000.0, vat: 210.0, vatRate: 21.0, classCode: null, isFixedAsset: 0,
+        );
+
+        $lines = $this->mapper->aggregateForDphPriznani(1, 2026, 5, 'monthly');
+        $this->assertArrayHasKey('41', $lines, 'Per-tenant override (40→ř.41) musí vyhrát nad globálním seedem');
+        $this->assertArrayNotHasKey('40', $lines, 'Globální mapování 40→ř.40 nesmí vyhrát');
+        $this->assertSame(1000.0, $lines['41']['base']);
+    }
+
     // ───── helpers ─────────────────────────────────────────────────────────
 
     private function createSchema(): void
@@ -153,8 +175,8 @@ final class VatClassificationMapperTest extends TestCase
         $this->pdo->exec("INSERT INTO currencies (id, code) VALUES (1, 'CZK'), (2, 'EUR')");
 
         // VatLedgerService JOINuje clients + countries (kvůli protistraně/zemi pro KH).
-        $this->pdo->exec("CREATE TABLE countries (id INTEGER PRIMARY KEY, iso2 TEXT NOT NULL)");
-        $this->pdo->exec("INSERT INTO countries (id, iso2) VALUES (1, 'CZ'), (4, 'DE')");
+        $this->pdo->exec("CREATE TABLE countries (id INTEGER PRIMARY KEY, iso2 TEXT NOT NULL, is_eu INTEGER NOT NULL DEFAULT 0)");
+        $this->pdo->exec("INSERT INTO countries (id, iso2, is_eu) VALUES (1, 'CZ', 1), (4, 'DE', 1)");
         $this->pdo->exec("CREATE TABLE clients (
             id INTEGER PRIMARY KEY, company_name TEXT NOT NULL DEFAULT '',
             dic TEXT NULL, country_id INTEGER NULL
