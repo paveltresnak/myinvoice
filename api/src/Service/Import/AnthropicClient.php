@@ -344,6 +344,105 @@ EOT;
     }
 
     /**
+     * Lightweight extrakce JEN total_with_vat z PDF — pro recheck / sanity check
+     * scenarios kde nepotřebujeme items/klient/datumy. Vrátí jednu number, nebo
+     * null pokud AI fail / nemůže najít K úhradě.
+     *
+     * Výhody vs extractInvoice():
+     *   - max_tokens 100 místo 4096 (output ~10× kratší)
+     *   - jednodušší prompt (kratší input tokens)
+     *   - bez tenant context bloku (pro pure total extraction nepotřebné)
+     *   - typicky 5-10× levnější per call (Haiku ~$0.0001 místo $0.001)
+     *
+     * Použití: jako AI fallback v `PdfTotalExtractor` když ISDOC + regex selžou.
+     *
+     * @return array{ok: bool, total?: ?float, error?: string, model?: string, usage?: array}
+     */
+    public function extractPdfTotal(int $supplierId, string $pdfBytes, ?string $modelOverride = null): array
+    {
+        $creds = $this->getCredentials($supplierId);
+        if ($creds === null) {
+            return ['ok' => false, 'error' => 'Anthropic API key nenastaven pro tohoto suppliera.'];
+        }
+        if (strlen($pdfBytes) > self::MAX_PDF_BYTES) {
+            return ['ok' => false, 'error' => 'PDF přesahuje limit ' . self::MAX_PDF_BYTES . ' B.'];
+        }
+        if (!str_starts_with($pdfBytes, '%PDF')) {
+            return ['ok' => false, 'error' => 'Soubor není validní PDF.'];
+        }
+
+        $model = $modelOverride ?: $creds['default_model'];
+        $base64Pdf = base64_encode($pdfBytes);
+
+        // Minimalistický prompt — chceme jediné číslo, JSON s jedním polem.
+        $systemPrompt = <<<'EOT'
+Z PDF faktury vrátíš JEN finální částku k úhradě (= "K úhradě", "Celkem k platbě", "Total to pay")
+ve formátu JSON. Žádný markdown, žádné komentáře.
+
+Schema: {"total_with_vat": number}
+- number je číslo bez měny (z 1 502,00 Kč vrať 1502.00)
+- Pokud finální K úhradě nelze určit jednoznačně, vrať {"total_with_vat": null}
+- U DOBROPISU vrať kladné číslo (znaménko si aplikujeme my)
+- POZOR na sekce "Z minulého období" / "Nedoplatek z minulého období" / "Přijaté platby" —
+  to NENÍ aktuální K úhradě. Hledej PROVĚŘOVANÉ K úhradě v hlavním souhrnu.
+EOT;
+
+        try {
+            ['code' => $code, 'body' => $body] = $this->postWithRetry([
+                'model'      => $model,
+                'max_tokens' => 100,
+                'system'     => $systemPrompt,
+                'messages'   => [[
+                    'role'    => 'user',
+                    'content' => [
+                        [
+                            'type'   => 'document',
+                            'source' => [
+                                'type'       => 'base64',
+                                'media_type' => 'application/pdf',
+                                'data'       => $base64Pdf,
+                            ],
+                        ],
+                        [
+                            'type' => 'text',
+                            'text' => 'Vrať K úhradě podle JSON schema.',
+                        ],
+                    ],
+                ]],
+            ], $creds['api_key']);
+            if ($code !== 200) {
+                $msg = is_array($body) ? ($body['error']['message'] ?? 'HTTP ' . $code) : 'HTTP ' . $code;
+                return ['ok' => false, 'error' => $msg];
+            }
+
+            $text = (string) ($body['content'][0]['text'] ?? '');
+            $text = preg_replace('/^```(?:json)?\s*|\s*```\s*$/m', '', $text) ?? $text;
+            $data = json_decode(trim($text), true);
+            if (!is_array($data) || !array_key_exists('total_with_vat', $data)) {
+                return ['ok' => false, 'error' => 'Claude vrátil invalid JSON: ' . substr($text, 0, 100)];
+            }
+
+            $total = $data['total_with_vat'];
+            $total = is_numeric($total) ? (float) $total : null;
+
+            // Increment usage counter (stejně jako extractInvoice, je to AI call)
+            $this->db->pdo()->prepare(
+                'UPDATE supplier SET anthropic_extractions_count = anthropic_extractions_count + 1 WHERE id = ?'
+            )->execute([$supplierId]);
+
+            return [
+                'ok'    => true,
+                'total' => $total,
+                'model' => $body['model'] ?? $model,
+                'usage' => $body['usage'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->error('Anthropic extractPdfTotal failed', ['supplier_id' => $supplierId, 'error' => $e->getMessage()]);
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Sestaví prioritní hlavičku promptu s tenant info, aby AI vědělo, že
      * tato konkrétní firma je VŽDY odběratel (customer) — NIKDY dodavatel.
      *
