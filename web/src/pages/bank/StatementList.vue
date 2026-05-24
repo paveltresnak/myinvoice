@@ -8,7 +8,7 @@ import { useToast } from '@/composables/useToast'
 import { apiErrorMessage } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
@@ -40,6 +40,25 @@ async function load() {
   finally { loading.value = false }
 }
 onMounted(load)
+
+// Seskupení výpisů po měsících (YYYY-MM z statement_date), zachová pořadí ze
+// serveru. Tabulka i karty se opticky rozdělí měsíčními hlavičkami.
+function monthLabel(ym: string): string {
+  if (!ym) return '—'
+  const d = new Date(ym + '-01T00:00:00')
+  if (isNaN(d.getTime())) return ym
+  const s = d.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'cs-CZ', { month: 'long', year: 'numeric' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+const groupedStatements = computed(() => {
+  const map = new Map<string, BankStatement[]>()
+  for (const s of statements.value) {
+    const ym = (s.statement_date ?? '').slice(0, 7)
+    if (!map.has(ym)) map.set(ym, [])
+    map.get(ym)!.push(s)
+  }
+  return [...map.entries()].map(([month, items]) => ({ month, label: monthLabel(month), items }))
+})
 
 async function onDelete(s: BankStatement, ev: MouseEvent) {
   ev.stopPropagation()
@@ -161,8 +180,14 @@ async function onFileSelected(e: Event) {
             <th class="px-3 py-2 text-center font-medium w-24"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-neutral-100">
-          <tr v-for="s in statements" :key="s.id" @click="router.push(`/bank/${s.id}`)" class="cursor-pointer hover:bg-neutral-50">
+        <tbody v-for="group in groupedStatements" :key="group.month" class="divide-y divide-neutral-100">
+          <tr class="bg-neutral-50/80 border-t border-neutral-200">
+            <td colspan="8" class="px-3 py-1.5 text-xs font-semibold text-neutral-600 tracking-wide">
+              {{ group.label }}
+              <span class="font-normal text-neutral-400 ml-1">({{ group.items.length }})</span>
+            </td>
+          </tr>
+          <tr v-for="s in group.items" :key="s.id" @click="router.push(`/bank/${s.id}`)" class="cursor-pointer hover:bg-neutral-50">
             <td class="px-3 py-2 text-xs">{{ formatDate(s.statement_date) }}<span v-if="s.statement_number" class="text-neutral-400 ml-1">#{{ s.statement_number }}</span></td>
             <td class="px-3 py-2 text-xs">
               <div class="font-mono">{{ s.account_number }}</div>
@@ -198,9 +223,14 @@ async function onFileSelected(e: Event) {
       </table>
       </div>
 
-      <!-- Mobile: karty -->
-      <div class="md:hidden divide-y divide-neutral-100">
-        <div v-for="s in statements" :key="`m-${s.id}`"
+      <!-- Mobile: karty seskupené po měsících -->
+      <div class="md:hidden">
+        <template v-for="group in groupedStatements" :key="`mg-${group.month}`">
+          <div class="bg-neutral-50/80 border-t border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600">
+            {{ group.label }}<span class="font-normal text-neutral-400 ml-1">({{ group.items.length }})</span>
+          </div>
+          <div class="divide-y divide-neutral-100">
+        <div v-for="s in group.items" :key="`m-${s.id}`"
           @click="router.push(`/bank/${s.id}`)"
           class="cursor-pointer hover:bg-neutral-50 px-3 py-3">
           <div class="flex items-baseline justify-between gap-2">
@@ -233,6 +263,8 @@ async function onFileSelected(e: Event) {
             </button>
           </div>
         </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
