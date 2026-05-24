@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] — 2026-05-24
+
+Patch release nad v4.1.0 (~3 hodiny později) — production hotfix
+regrese z migrace 0045 + drobné UX vylepšení.
+
+### Fixed (Banka)
+
+- **`GET /api/bank-statements/{id}` vracelo 500** — `Json::ok()` házelo
+  `JsonException: Malformed UTF-8 characters` v `BankStatementAction::detail()`.
+  Root cause: `SELECT bs.*` po migraci 0045 tahá i `file_content` (MEDIUMBLOB
+  se surovými CP1250 bajty GPC souboru), `json_encode()` default vyžaduje
+  validní UTF-8 → padne. Důsledek: detail bank výpisu se v UI nezobrazil
+  na žádném tenant, který stihl po upgrade nahrát alespoň jeden nový GPC.
+  Fix: explicit column list ve SELECT, `file_content` se vůbec nevrací
+  z `/detail` (bajty zůstávají dostupné jen přes `/download` endpoint
+  s `Content-Type: text/plain; charset=windows-1250`). Místo BLOBu
+  exposujeme `(file_content IS NOT NULL) AS has_file` — stejný pattern,
+  který list endpoint už používal od commitu `95aed56`. Detail jsem
+  zapomněl propsat, odtud regrese.
+
+### Added (Banka)
+
+- **Hromadný GPC upload** — `<input type="file" multiple>` v `/bank`.
+  User může vybrat víc souborů najednou; frontend sekvenčně iteruje
+  (kvůli `bank_statements.file_hash` dedupu — paralelní upload by druhou
+  duplicitu nezachytil mezi `INSERT` a `SELECT … WHERE hash`). Single-file
+  mode zachovává původní UX (toast + redirect na detail), batch mode ukáže
+  souhrnný toast `"5 importováno, 2 duplicit"` a zůstane na seznamu.
+  Prvních 5 chybných souborů v error banneru s názvem + důvodem.
+
+### Docs
+
+- **Manuál `24_Vykazy_DPH.md`** — nová sekce **Pole EPO / VetaP**:
+  kompletní mapping všech polí v *Nastavení → Daňové nastavení* na XML
+  atributy DPHDP3/DPHKH1 (`c_ufo`, `c_pracufo`, `c_okec`, `typ_ds`,
+  `typ_platce`, `ulice`+`c_pop`+`c_orient` jako tři samostatné atributy
+  od v4.0.6, `opr_*` od v4.0.6 pro PO, `sest_*`). Plus 7-krokový postup
+  podání na EPO portál a sekce „Časté problémy".
+- **Manuál `17_Importy.md`** — pět nových sekcí (17.8–17.12) o API
+  importech: iDoklad OAuth2 Client Credentials, Fakturoid s podporou
+  obou auth flow (legacy email+token i nový OAuth2 z v4.1.0), dry-run
+  preview, background worker s progress pollingem, časté problémy.
+- **`openapi.yaml`** — `GET /api/v1/codebooks/years`,
+  `DELETE /api/v1/bank-statements/{id}`,
+  `GET /api/v1/bank-statements/{id}/download` + nová pole na schématech
+  (`BankStatement.currency`/`has_file`, `PurchaseInvoice.is_fixed_asset`).
+  Aditivní změny, API version `1.0` zachována.
+
+### Chore
+
+- **`.github/FUNDING.yml`** — block-style YAML list místo inline flow array
+  (některé parsery jsou na single-item flow alergické), comment dovysvětlení
+  proč GitHub Sponsor button může být skrytý (repo-level setting toggle
+  v *Settings → Features*).
+
 ## [4.1.0] — 2026-05-24
 
 Velký combo release reagující na pět GitHub issues od externích uživatelů
