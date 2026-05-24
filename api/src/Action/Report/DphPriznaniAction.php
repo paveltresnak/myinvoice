@@ -197,7 +197,9 @@ final class DphPriznaniAction
             'validation_status' => $archived['validation_status'],
         ], $ip, $request->getHeaderLine('User-Agent'));
 
-        $filename = sprintf('dphdp3-%04d-%02d.xml', $year, $month);
+        $filename = $isQuarterly
+            ? sprintf('dphdp3-%04d-Q%d.xml', $year, (int) ceil($month / 3))
+            : sprintf('dphdp3-%04d-%02d.xml', $year, $month);
         $response->getBody()->write($result['xml']);
         return $response
             ->withHeader('Content-Type', 'application/xml; charset=utf-8')
