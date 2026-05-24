@@ -336,9 +336,12 @@ final class AiPdfExtractor
             'exchange_rate'         => null,
             'exchange_rate_source'  => 'manual',
             'reverse_charge'        => $reverseCharge,
-            // Rozdíl mezi přesným total a zaokrouhleným total z PDF (např. 229 - 228.69 = 0.31).
-            // Calculator pak respektuje uložený total_with_vat = sum(items) + rounding.
-            'rounding'              => ($isCredit ? -1.0 : 1.0) * $this->computeRounding($data),
+            // Rounding nastavíme až PO recompute z items, ne z AI hodnoty
+            // (AI dělá DPH math sama a občas se splete o ±1 haléř — viz user report
+            // Vodafone faktury 1025255728, kde AI vrátila total_with_vat=1502,03
+            // místo přepočtu 1241,34×1,21=1502,02, takže rounding vyšel -0,03
+            // místo -0,02 a "K úhradě" pak ukazovalo 1501,99 místo 1502,00).
+            'rounding'              => 0,
             'language'              => 'cs',
             'items'                 => $items,
         ];
@@ -355,18 +358,12 @@ final class AiPdfExtractor
         $id = $this->repo->createDraft($payload, $userId, $supplierId);
         $this->repo->replaceItems($id, $items);
         $this->calc->recompute($id);
-        // Apply rounding po recompute (createDraft ignoruje, recompute zachovává).
-        $rounding = (float) ($payload['rounding'] ?? 0);
-        if (abs($rounding) > 0.001) {
-            $this->repo->setRounding($id, $supplierId, $rounding);
-        } else {
-            // Fallback: pokud computeRounding vrátil 0 (AI nevrátila total_with_vat_rounded),
-            // ale AI total_with_vat se od přesného součtu z items liší o méně než 1 Kč,
-            // je to typické haléřové zaokrouhlení (např. 84092.58 → "K úhradě 84093,00").
-            // AI tu obvykle čte "K úhradě" celé číslo jako total_with_vat, ale nevyplní
-            // total_with_vat_rounded — proto si rounding dopočítáme tady.
-            $this->applyRoundingFromAiTotal($id, $supplierId, $data, $isCredit);
-        }
+        // Rounding počítáme AŽ TADY (po recompute) — vůči přesnému total z items,
+        // ne vůči AI's hodnotě (AI dělá DPH math sama a občas se splete o haléř).
+        // Preferujeme PDF rounded (`total_with_vat_rounded`), fallback na AI's
+        // `total_with_vat` (mnoho AI extracts vrátí "K úhradě" jako total_with_vat
+        // bez explicitního total_with_vat_rounded).
+        $this->applyRoundingFromPdfTotal($id, $supplierId, $data, $isCredit);
         // Pro non-CZK currency: auto-apply ČNB kurz k tax_date (nebo issue_date).
         $this->applyCnbRate($id, $supplierId, $data);
         // Pokud AI detekovala "NEPLAŤTE, JIŽ UHRAZENO" / "PAID" → mark as paid.
@@ -679,50 +676,43 @@ final class AiPdfExtractor
     }
 
     /**
-     * Compute rounding rozdíl mezi AI-extracted total_with_vat (sum of items) a
-     * total_with_vat_rounded (částka zobrazená na PDF, pokud byla zaokrouhlena).
+     * Rounding kalkulace POST recompute. Porovná hodnotu z PDF "K úhradě"
+     * s přesným součtem z items (= total_with_vat po `InvoiceMath::compute`).
+     * Rozdíl < 1 Kč uloží jako rounding offset.
      *
-     * Příklad: items sum 228.69, PDF říká "K úhradě 229" → rounding = 0.31.
-     * Pokud AI nedetekovala explicitní zaokrouhlení, vrátí 0.
-     */
-    private function computeRounding(array $data): float
-    {
-        $total = (float) ($data['total_with_vat'] ?? 0);
-        $rounded = isset($data['total_with_vat_rounded']) && $data['total_with_vat_rounded'] !== null
-            ? (float) $data['total_with_vat_rounded'] : null;
-        if ($rounded === null || $total === 0.0) return 0.0;
-        $diff = round($rounded - $total, 2);
-        // Sanity check — pouze pokud rozdíl je < 1 Kč (typicky zaokrouhlení nahoru/dolů)
-        return abs($diff) < 1.0 ? $diff : 0.0;
-    }
-
-    /**
-     * Fallback rounding kalkulace POST recompute: porovná AI's `total_with_vat`
-     * (= co AI přečetla jako "K úhradě" na PDF) s přesným součtem z items.
-     * Pokud se liší o méně než 1 Kč, je to haléřové zaokrouhlení a uloží se
-     * jako rounding offset.
+     * Priorita zdroje "K úhradě":
+     *   1) `data.total_with_vat_rounded` — explicitní pole, AI ho vyplní pokud
+     *      PDF má dvě hodnoty (sum items vs. K úhradě jiná čísla)
+     *   2) `data.total_with_vat` — fallback, mnoho AI extracts vrátí "K úhradě"
+     *      jako total_with_vat bez explicitního rounded pole
      *
-     * Volá se jen pokud computeRounding (= AI vyplnila explicitně `total_with_vat_rounded`)
-     * nevrátil výsledek. Mnoho AI extractů totiž `total_with_vat_rounded` nevyplní
-     * a `total_with_vat` je už zaokrouhlené z PDF.
+     * Důležité: NEpoužíváme AI hodnotu jako referenci pro recompute, jen jako
+     * PDF zobrazenou částku. Reference je VŽDY přepočtený items total z DB
+     * (po `recompute`) — AI dělá DPH math sama a občas se splete o haléř,
+     * referenční musí být deterministický kalkulátor (`InvoiceMath`).
      */
-    private function applyRoundingFromAiTotal(int $id, int $supplierId, array $data, bool $isCredit): void
+    private function applyRoundingFromPdfTotal(int $id, int $supplierId, array $data, bool $isCredit): void
     {
-        $aiTotal = isset($data['total_with_vat']) ? (float) $data['total_with_vat'] : null;
-        if ($aiTotal === null || $aiTotal === 0.0) return;
-        $aiTotal = abs($aiTotal);
+        $pdfTotal = null;
+        if (isset($data['total_with_vat_rounded']) && $data['total_with_vat_rounded'] !== null) {
+            $pdfTotal = (float) $data['total_with_vat_rounded'];
+        } elseif (isset($data['total_with_vat']) && $data['total_with_vat'] !== null) {
+            $pdfTotal = (float) $data['total_with_vat'];
+        }
+        if ($pdfTotal === null || $pdfTotal === 0.0) return;
+        $pdfTotal = abs($pdfTotal);
 
         $current = $this->repo->find($id, $supplierId);
         if ($current === null) return;
         $exactTotal = (float) abs((float) ($current['total_with_vat'] ?? 0));
         if ($exactTotal === 0.0) return;
 
-        $diff = round($aiTotal - $exactTotal, 2);
+        $diff = round($pdfTotal - $exactTotal, 2);
         if (abs($diff) > 0.0 && abs($diff) < 1.0) {
             try {
                 $this->repo->setRounding($id, $supplierId, $isCredit ? -1.0 * $diff : $diff);
             } catch (\Throwable $e) {
-                $this->logger->warning('AI extractor: applyRoundingFromAiTotal — setRounding selhalo', [
+                $this->logger->warning('AI extractor: applyRoundingFromPdfTotal — setRounding selhalo', [
                     'invoice_id' => $id,
                     'error' => $e->getMessage(),
                 ]);

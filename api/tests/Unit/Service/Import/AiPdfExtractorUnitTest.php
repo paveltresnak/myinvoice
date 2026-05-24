@@ -320,6 +320,27 @@ final class AiPdfExtractorUnitTest extends TestCase
         $this->invokeRounding(42, 1, ['total_with_vat' => null], false);
     }
 
+    public function testRounding_prefers_pdf_rounded_over_ai_total(): void
+    {
+        // Regression: user report Vodafone faktura 1025255728.
+        //   Items recompute: 1×1241,34 × 1,21 = 1502,02 (= total_with_vat v DB)
+        //   AI total_with_vat (její DPH math): 1502,03  ← se splete o haléř
+        //   AI total_with_vat_rounded (PDF "K úhradě"): 1502,00
+        //   Reálný rounding má být PDF − recompute = 1502,00 − 1502,02 = -0,02
+        //   PŘED FIXEM: computeRounding bral rounded − AI total = -0,03 → "K úhradě" 1501,99
+        //   PO FIXU: applyRoundingFromPdfTotal preferuje rounded, počítá vůči
+        //   přesnému items totalu z DB → -0,02 → "K úhradě" 1502,00 ✓
+        $this->repo->method('find')->willReturn(['total_with_vat' => 1502.02]);
+        $this->repo->expects($this->once())
+            ->method('setRounding')
+            ->with(42, 1, -0.02);
+
+        $this->invokeRounding(42, 1, [
+            'total_with_vat'         => 1502.03,  // AI's chybný DPH součet
+            'total_with_vat_rounded' => 1502.00,  // PDF "K úhradě" — preferovat
+        ], false);
+    }
+
     // ── Helper: reflection invokers ────────────────────────────────────────
 
     private function invokeDetectWeak(array $data, ?string $tenantIc): ?string
@@ -336,7 +357,7 @@ final class AiPdfExtractorUnitTest extends TestCase
 
     private function invokeRounding(int $id, int $supplierId, array $data, bool $isCredit): void
     {
-        $ref = new \ReflectionMethod($this->extractor, 'applyRoundingFromAiTotal');
+        $ref = new \ReflectionMethod($this->extractor, 'applyRoundingFromPdfTotal');
         $ref->invoke($this->extractor, $id, $supplierId, $data, $isCredit);
     }
 }
