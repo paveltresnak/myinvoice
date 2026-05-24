@@ -482,7 +482,12 @@ final class IdokladImportService
      */
     private function loadVatRateMap(): array
     {
-        $rows = $this->db->pdo()->query('SELECT id, rate_percent FROM vat_rates WHERE is_active = 1')->fetchAll(\PDO::FETCH_ASSOC);
+        // vat_rates nemá is_active — platnost se řídí valid_from/valid_to (k dnešku).
+        $rows = $this->db->pdo()->query(
+            'SELECT id, rate_percent FROM vat_rates
+              WHERE (valid_from IS NULL OR valid_from <= CURDATE())
+                AND (valid_to   IS NULL OR valid_to   >= CURDATE())'
+        )->fetchAll(\PDO::FETCH_ASSOC);
         $map = [];
         foreach ($rows as $r) {
             $map[(int) $r['id']] = (float) $r['rate_percent'];
