@@ -831,9 +831,13 @@ final class BankStatementAction
         if (!$pi || (int) $pi['supplier_id'] !== $supplierId) {
             return Json::error($response, 'purchase_not_found', 'Přijatá faktura nenalezena.', 404);
         }
-        if (!in_array($pi['status'], ['received', 'booked'], true)) {
+        // 'paid' povolujeme — kandidáti nabízejí i zaplacené faktury (duplicitní/druhá
+        // platba, doplatek); transakci jen navážeme, paid_at nepřepisujeme (viz níže).
+        // Mirror StatementMatcher::matchPurchase i vystavené faktury (manualMatch).
+        $alreadyPaid = ($pi['status'] === 'paid');
+        if (!in_array($pi['status'], ['received', 'booked', 'paid'], true)) {
             return Json::error($response, 'invalid_status',
-                "Faktura ve stavu '{$pi['status']}' nelze manuálně označit jako zaplacenou.", 409);
+                "Přijatou fakturu ve stavu '{$pi['status']}' nelze spárovat.", 409);
         }
 
         // Load transaction for amount + posted_at
@@ -848,10 +852,13 @@ final class BankStatementAction
 
         $pdo->beginTransaction();
         try {
-            // Mark purchase paid
-            $pdo->prepare(
-                "UPDATE purchase_invoices SET status = 'paid', paid_at = ? WHERE id = ?"
-            )->execute([$postedAt, $purchaseInvoiceId]);
+            // Mark purchase paid — jen pokud ještě není (ručně zaplacenou jen navážeme,
+            // status/paid_at nepřepisujeme — respektujeme stav nastavený uživatelem).
+            if (!$alreadyPaid) {
+                $pdo->prepare(
+                    "UPDATE purchase_invoices SET status = 'paid', paid_at = ? WHERE id = ?"
+                )->execute([$postedAt, $purchaseInvoiceId]);
+            }
 
             // Insert payment_match row (N:N support pro splátky)
             $pdo->prepare(
