@@ -604,6 +604,8 @@ async function submit() {
           </button>
         </div>
         <p class="mb-3 text-xs text-neutral-500">{{ t('invoice.negative_item_hint') }}</p>
+        <!-- Desktop: tabulka -->
+        <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="text-xs text-neutral-500">
             <tr>
@@ -639,6 +641,48 @@ async function submit() {
             </tr>
           </tbody>
         </table>
+        </div>
+
+        <!-- Mobile: stack karet (každé pole na vlastním řádku, čitelné inputy) -->
+        <div v-if="form.items.length > 0" class="md:hidden divide-y divide-neutral-100 border-t border-neutral-100">
+          <div v-for="(it, idx) in form.items" :key="`m-${idx}`" :class="['py-3 space-y-2', itemHasBothNegative(it) ? 'bg-danger-50' : '']">
+            <div class="flex items-center justify-between text-xs text-neutral-500">
+              <span class="font-mono">#{{ idx + 1 }}</span>
+              <button type="button" @click="removeItem(idx)" class="cursor-pointer w-8 h-8 inline-flex items-center justify-center border border-danger-500/40 text-danger-500 hover:bg-danger-50 rounded text-lg leading-none">×</button>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.description') }}</label>
+              <input v-model="it.description" type="text" class="w-full h-10 px-3 border border-neutral-200 rounded text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.qty') }}</label>
+                <input v-model="it.quantity" v-math type="text" inputmode="decimal" :class="['w-full h-10 px-3 border rounded text-right font-mono text-sm', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.unit') }}</label>
+                <select v-model="it.unit" class="w-full h-10 px-2 border border-neutral-200 rounded bg-white text-sm">
+                  <option v-for="u in units" :key="u.id" :value="u.code">{{ u.code }}</option>
+                  <option v-if="it.unit && !units.some(u => u.code === it.unit)" :value="it.unit">{{ it.unit }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.unit_price') }}</label>
+                <input v-model="it.unit_price_without_vat" v-math type="text" inputmode="decimal" :class="['w-full h-10 px-3 border rounded text-right font-mono text-sm', itemHasBothNegative(it) ? 'border-danger-400' : 'border-neutral-200']" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('invoice.items_table.vat') ?? 'DPH' }}</label>
+                <select v-model.number="it.vat_rate_id" class="w-full h-10 px-2 border border-neutral-200 rounded bg-white text-sm">
+                  <option v-for="r in vatRates" :key="r.id" :value="r.id">
+                    {{ Number(r.rate_percent) > 0 ? r.rate_percent + ' %' : (r.is_reverse_charge ? 'RC' : '0 %') }}
+                  </option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
         <div v-if="hasNonPositiveAmountToPay" class="mt-3 rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-700">
           {{ t('invoice.amount_positive_required') }}
         </div>

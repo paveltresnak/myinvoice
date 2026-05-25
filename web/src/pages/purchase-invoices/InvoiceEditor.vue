@@ -747,7 +747,9 @@ function fieldErr(key: string): string | null {
         <div v-if="form.items.length === 0" class="text-sm text-neutral-500 py-8 text-center">
           {{ t('purchase_invoice.items.empty') }}
         </div>
-        <table v-else class="w-full text-sm border-collapse">
+        <!-- Desktop: tabulka -->
+        <div v-else class="hidden md:block overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
           <thead>
             <tr class="text-xs text-neutral-500 bg-neutral-50">
               <th class="text-left py-2 pl-5 pr-2 font-normal">{{ t('purchase_invoice.items.description') }}</th>
@@ -787,6 +789,49 @@ function fieldErr(key: string): string | null {
             </tr>
           </tbody>
         </table>
+        </div>
+
+        <!-- Mobile: stack karet (každé pole na vlastním řádku, čitelné inputy) -->
+        <div v-if="form.items.length > 0" class="md:hidden divide-y divide-neutral-100 border-t border-neutral-100">
+          <div v-for="(it, i) in form.items" :key="`m-${i}`" class="p-3 space-y-2">
+            <div class="flex items-center justify-between text-xs text-neutral-500">
+              <span class="font-mono">#{{ i + 1 }}</span>
+              <button type="button" @click="removeItem(i)" class="cursor-pointer w-8 h-8 inline-flex items-center justify-center border border-danger-500/40 text-danger-500 hover:bg-danger-50 rounded text-lg leading-none" :title="t('purchase_invoice.items.remove')">✕</button>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('purchase_invoice.items.description') }}</label>
+              <input v-model="it.description" type="text" class="w-full h-10 px-3 border border-neutral-200 rounded text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('purchase_invoice.items.quantity') }}</label>
+                <input v-model="it.quantity" v-math type="text" inputmode="decimal" class="w-full h-10 px-3 border border-neutral-200 rounded text-sm text-right font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('purchase_invoice.items.unit') }}</label>
+                <select v-model="it.unit" class="w-full h-10 px-2 border border-neutral-200 rounded bg-white text-sm">
+                  <option v-for="u in units" :key="u.code" :value="u.code">{{ u.code }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('purchase_invoice.items.unit_price') }}</label>
+                <input v-model="it.unit_price_without_vat" v-math type="text" inputmode="decimal" class="w-full h-10 px-3 border border-neutral-200 rounded text-sm text-right font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-neutral-600 mb-1">{{ t('purchase_invoice.items.vat_rate') }}</label>
+                <select v-model.number="it.vat_rate_id" class="w-full h-10 px-2 border border-neutral-200 rounded bg-white text-sm">
+                  <option v-for="v in vatRates" :key="v.id" :value="v.id">{{ vatRateLabel(v) }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-baseline justify-between pt-1 border-t border-neutral-100">
+              <span class="text-xs font-medium text-neutral-500 uppercase tracking-wide">{{ t('purchase_invoice.items.total_with_vat') }}</span>
+              <span class="font-mono font-semibold">{{ formatMoney(itemTotal(it).with, currencyCode) }}</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Totals preview uvnitř Box 2 + editovatelné zaokrouhlení -->
         <div v-if="form.items.length > 0" class="px-5 py-3 border-t border-neutral-100 bg-neutral-50/50 flex justify-end">
