@@ -95,7 +95,7 @@ if ($tool === '') {
 // Heslo + connection params přes --defaults-extra-file (ne v cmdline, ne přes env).
 // Win-fix: 'localhost' se občas nezresolvuje (mariadb-dump 2005 / 11003) → 127.0.0.1.
 $dumpHost = ($dbHost === 'localhost') ? '127.0.0.1' : $dbHost;
-$cnf = tempnam(sys_get_temp_dir(), 'myinv-dump-') ?: ($rootDir . '/storage/backup/.dump.cnf');
+$cnf = tempnam(sys_get_temp_dir(), 'myinv-dump-') ?: ($backupDir . '/.dump.cnf');
 file_put_contents($cnf, sprintf(
     "[client]\nhost=%s\nport=%d\nuser=%s\npassword=\"%s\"\n",
     $dumpHost,
@@ -105,7 +105,10 @@ file_put_contents($cnf, sprintf(
 ));
 @chmod($cnf, 0600);
 
-$errFile     = $rootDir . '/storage/backup/.last-error';
+// errFile i fallback cnf MUSÍ ležet ve vyřešeném $backupDir (ten je vytvořen výše),
+// ne natvrdo v $rootDir/storage/backup — na Docker/PaaS s MYINVOICE_DATA_DIR ten
+// adresář neexistuje a shell redirect `2>$errFile` selže s rc=2 ještě před dumpem (#42, zbytek po #34).
+$errFile     = $backupDir . '/.last-error';
 $skipRoutines = (bool) $config->get('db.backup_skip_routines', false);
 
 $runDump = static function (bool $withRoutines) use ($tool, $cnf, $dbName, $errFile, $sqlTmp, $rootDir): array {
