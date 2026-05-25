@@ -1702,6 +1702,11 @@
         "kh_code": "KH"
       },
       "subtotal": "CELKEM",
+      "summary_issued": "Uskutečněná plnění (daň na výstupu)",
+      "summary_received": "Přijatá plnění (odpočet na vstupu)",
+      "vat_balance": "Výsledná DPH (na výstupu − odpočet)",
+      "vat_balance_due": "Vlastní daňová povinnost",
+      "vat_balance_refund": "Nadměrný odpočet",
       "note_d_marker": "(Je-li za částkou DPH kód D, je DPH oceněno odlišným kursem, než je základní účetní kurs.)",
       "no_data": "Pro zvolené období nejsou v knize DPH žádné záznamy.",
       "draft_badge": "Koncept"

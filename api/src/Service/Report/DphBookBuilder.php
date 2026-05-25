@@ -44,7 +44,11 @@ final class DphBookBuilder
      *   period: array{year:int, month:int, start:string, end:string, label:string},
      *   supplier: array<string,mixed>,
      *   sections: list<array<string,mixed>>,
-     *   totals: array{base:float, vat:float, total:float}
+     *   totals: array{
+     *     issued: array{base:float, vat:float, total:float},
+     *     received: array{base:float, vat:float, total:float},
+     *     vat_balance: float
+     *   }
      * }
      */
     public function build(int $supplierId, int $year, int $month): array
@@ -109,8 +113,14 @@ final class DphBookBuilder
             return strcmp($a['key'], $b['key']);
         });
 
-        // Per-sekce subtotal + global totals
-        $totBase = $totVat = $totTotal = 0.0;
+        // Per-sekce subtotal + global totals.
+        //
+        // Totals JE NUTNÉ držet odděleně pro uskutečněná (daň na výstupu, sekce 36)
+        // a přijatá plnění (odpočet na vstupu, sekce 15) — sčítat je dohromady nedává
+        // účetní smysl. Výsledná bilance DPH = daň na výstupu − odpočet na vstupu
+        // (kladná = vlastní daňová povinnost, záporná = nadměrný odpočet).
+        $issued   = ['base' => 0.0, 'vat' => 0.0, 'total' => 0.0];
+        $received = ['base' => 0.0, 'vat' => 0.0, 'total' => 0.0];
         foreach ($sectionList as &$s) {
             $sb = $sv = $st = 0.0;
             foreach ($s['rows'] as $row) {
@@ -121,12 +131,13 @@ final class DphBookBuilder
             $s['subtotal_base']  = $sb;
             $s['subtotal_vat']   = $sv;
             $s['subtotal_total'] = $st;
-            // Do globálních totals započítáváme jen non-secondary řádky aby se
-            // dovoz služby nezdvojoval. (Sekce 43 je secondary mirror sekce 12.)
+            // Do souhrnů započítáváme jen non-secondary řádky aby se dovoz služby
+            // nezdvojoval. (Sekce 43/47 jsou secondary mirror sekce 12/40-45.)
             if (empty($s['is_secondary'])) {
-                $totBase  += $sb;
-                $totVat   += $sv;
-                $totTotal += $st;
+                $bucket = $this->sectionOrder($s['key']) === 0 ? 'issued' : 'received';
+                ${$bucket}['base']  += $sb;
+                ${$bucket}['vat']   += $sv;
+                ${$bucket}['total'] += $st;
             }
         }
         unset($s);
@@ -144,9 +155,10 @@ final class DphBookBuilder
             'supplier' => $supplier,
             'sections' => $sectionList,
             'totals' => [
-                'base'  => $totBase,
-                'vat'   => $totVat,
-                'total' => $totTotal,
+                'issued'      => $issued,
+                'received'    => $received,
+                // DPH na výstupu − odpočet na vstupu.
+                'vat_balance' => $issued['vat'] - $received['vat'],
             ],
         ];
     }

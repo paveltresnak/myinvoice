@@ -95,7 +95,11 @@ export interface DphBookPreview {
   }
   supplier: Record<string, unknown>
   sections: DphBookSection[]
-  totals: { base: number; vat: number; total: number }
+  totals: {
+    issued: { base: number; vat: number; total: number }
+    received: { base: number; vat: number; total: number }
+    vat_balance: number
+  }
 }
 
 export const reportsApi = {

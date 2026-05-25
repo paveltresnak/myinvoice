@@ -1702,6 +1702,11 @@
         "kh_code": "KH"
       },
       "subtotal": "TOTAL",
+      "summary_issued": "Output supplies (output VAT)",
+      "summary_received": "Received supplies (input VAT deduction)",
+      "vat_balance": "Net VAT (output − deduction)",
+      "vat_balance_due": "VAT liability",
+      "vat_balance_refund": "Excess deduction (refund)",
       "note_d_marker": "(If the VAT amount is marked with code D, VAT is valued at a different exchange rate than the base accounting rate.)",
       "no_data": "No entries in the VAT ledger for the selected period.",
       "draft_badge": "Draft"

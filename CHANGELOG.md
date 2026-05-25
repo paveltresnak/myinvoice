@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.5] — 2026-05-25
+
+Oprava souhrnu v **Knize DPH**.
+
+### Fixed
+
+- **Souhrn v Knize DPH sčítal uskutečněná i přijatá plnění dohromady** — celková karta dole pod žurnálem sečetla základ a DPH vystavených (daň na výstupu) i přijatých dokladů (odpočet na vstupu) do jednoho čísla, což účetně nedávalo smysl. Souhrn je nově rozdělený na **uskutečněná plnění** (daň na výstupu) a **přijatá plnění** (odpočet na vstupu) zvlášť, plus řádek **výsledná DPH** (na výstupu − odpočet) s rozlišením vlastní daňová povinnost / nadměrný odpočet. Secondary sekce (ř. 43 reverse charge mirror, ř. 47 majetek) se do souhrnů nezapočítávají, jako dřív. PDF nebylo dotčeno — to grand totals nikdy nerenderovalo, jen subtotaly per sekci.
+
 ## [4.2.4] — 2026-05-25
 
 Opravy importu/exportu (**reverse charge**) a **zálohování na Docker/PaaS**.

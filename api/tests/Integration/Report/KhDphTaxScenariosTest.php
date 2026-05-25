@@ -254,6 +254,15 @@ final class KhDphTaxScenariosTest extends TestCase
         // 47.047 — hodnota pořízeného majetku (P8)
         $this->assertArrayHasKey('47.047', $sec);
         $this->assertEqualsWithDelta(40000, $sec['47.047']['subtotal_base'], 0.01);
+
+        // Souhrny MUSÍ být oddělené pro uskutečněná (výstup) a přijatá (odpočet) —
+        // sčítat je dohromady nedává smysl. Secondary sekce (43/47) se nezapočítávají.
+        $this->assertEqualsWithDelta(11550, $book['totals']['issued']['vat'], 0.01,
+            'totals.issued = jen daň na výstupu (36.001)');
+        $this->assertEqualsWithDelta(14700, $book['totals']['received']['vat'], 0.01,
+            'totals.received = odpočet na vstupu (15.040+15.003+15.010), bez mirror 43/47');
+        // Bilance = výstup − odpočet (záporná = nadměrný odpočet).
+        $this->assertEqualsWithDelta(-3150, $book['totals']['vat_balance'], 0.01);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

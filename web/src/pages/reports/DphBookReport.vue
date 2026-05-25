@@ -183,19 +183,70 @@ onMounted(loadPreview)
         </div>
       </div>
 
-      <!-- Total summary card -->
-      <div v-if="preview.sections.length > 0" class="bg-primary-50 border border-primary-200 rounded-lg p-4 grid grid-cols-3 gap-4">
-        <div>
-          <div class="text-xs uppercase text-primary-700 font-medium">{{ t('reports.dph_book.col.base_czk') }}</div>
-          <div class="text-lg font-bold font-mono">{{ fmtMoney(preview.totals.base) }}</div>
+      <!-- Total summary — odděleně uskutečněná (daň na výstupu) a přijatá (odpočet) -->
+      <div v-if="preview.sections.length > 0" class="grid gap-4 md:grid-cols-2">
+        <!-- Uskutečněná plnění -->
+        <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-3">
+            {{ t('reports.dph_book.summary_issued') }}
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.base_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.issued.base) }}</div>
+            </div>
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.vat_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.issued.vat) }}</div>
+            </div>
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.total_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.issued.total) }}</div>
+            </div>
+          </div>
         </div>
-        <div>
-          <div class="text-xs uppercase text-primary-700 font-medium">{{ t('reports.dph_book.col.vat_czk') }}</div>
-          <div class="text-lg font-bold font-mono">{{ fmtMoney(preview.totals.vat) }}</div>
+        <!-- Přijatá plnění -->
+        <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-3">
+            {{ t('reports.dph_book.summary_received') }}
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.base_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.received.base) }}</div>
+            </div>
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.vat_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.received.vat) }}</div>
+            </div>
+            <div>
+              <div class="text-[11px] uppercase text-neutral-400">{{ t('reports.dph_book.col.total_czk') }}</div>
+              <div class="text-base font-bold font-mono">{{ fmtMoney(preview.totals.received.total) }}</div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Výsledná DPH = na výstupu − odpočet (kladná = povinnost, záporná = nadměrný odpočet) -->
+      <div v-if="preview.sections.length > 0"
+        class="border rounded-lg p-4 flex items-center justify-between"
+        :class="preview.totals.vat_balance >= 0
+          ? 'bg-primary-50 border-primary-200'
+          : 'bg-success-50 border-success-200'">
         <div>
-          <div class="text-xs uppercase text-primary-700 font-medium">{{ t('reports.dph_book.col.total_czk') }}</div>
-          <div class="text-lg font-bold font-mono">{{ fmtMoney(preview.totals.total) }}</div>
+          <div class="text-xs uppercase tracking-wide font-medium"
+            :class="preview.totals.vat_balance >= 0 ? 'text-primary-700' : 'text-success-700'">
+            {{ t('reports.dph_book.vat_balance') }}
+          </div>
+          <div class="text-sm text-neutral-600 mt-0.5">
+            {{ preview.totals.vat_balance >= 0
+              ? t('reports.dph_book.vat_balance_due')
+              : t('reports.dph_book.vat_balance_refund') }}
+          </div>
+        </div>
+        <div class="text-2xl font-bold font-mono"
+          :class="preview.totals.vat_balance >= 0 ? 'text-primary-700' : 'text-success-700'">
+          {{ fmtMoney(Math.abs(preview.totals.vat_balance)) }}
         </div>
       </div>
 
