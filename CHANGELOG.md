@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] — 2026-05-25
+
+Patch zaměřený na **ISDOC v cizí měně** — export i import teď odpovídají standardu
+ISDOC 6.0.2, ověřeno proti oficiálnímu XSD. Plus přejmenování vydaných faktur a
+migrační nástroj z Money S3.
+
+### Fixed
+
+- **ISDOC export cizoměnových faktur byl nekonformní se standardem.** Base částky
+  (`UnitPrice`, `LineExtensionAmount`, `PayableAmount` …) se zapisovaly v měně
+  faktury a sourozenecké `*Curr` elementy chyběly úplně. Dle ISDOC jsou base částky
+  vždy v `LocalCurrencyCode` (CZK) a cizoměnové hodnoty patří do `*Curr`. Konformní
+  účetní software tak u např. EUR faktury interpretoval částku špatně (o kurz).
+  Export teď generuje base v CZK (× kurz) + `*Curr` v měně faktury, ve správném
+  pořadí dle XSD. **CZK faktury zůstávají beze změny.**
+- **ISDOC import z cizích systémů** (#38) — jednotková cena cizoměnových faktur se
+  čte z `LineExtensionAmountCurr` / množství, ne z `<UnitPrice>` (který je dle
+  standardu vždy v lokální měně). Dříve se u EUR faktury importovala CZK hodnota.
+- **Rekontrola AI extrakce** — `PdfTotalExtractor` četl z embedded ISDOC base (CZK)
+  total a porovnával s `total_with_vat` v měně faktury → falešné varování u
+  cizoměnových dokladů. Teď čte `*Curr`. Opraven i čtený element na `PayableAmount`
+  (dřív se hledal neexistující `PayableRoundedAmount`).
+- **Admin** — doplněn překlad `login_otp`; sazby DPH seřazené (platné tučně nahoře).
+
+### Added
+
+- **XSD validace ISDOC.** Commitnuto oficiální `isdoc-invoice-6.0.2.xsd` do
+  `api/xsd/`; `XmlSchemaValidator` nově umí `isdoc`. Testy: unit (syntetická data
+  + round-trip přes parser) i integrace (reálné faktury → XSD). `cmd/download-xsd.{cmd,sh}`
+  umí stáhnout i ISDOC schema (token `isdoc`).
+- **Migrační skript Money S3 → MyInvoice** přes REST API v1 (`tools/money-s3-import`;
+  vyloučen z produkčních artefaktů).
+
+### Changed
+
+- **„Faktury" přejmenovány na „Vydané faktury"** v menu i v nadpisu seznamu —
+  odlišení od přijatých faktur. Anglicky „Issued invoices".
+
 ## [4.2.0] — 2026-05-24
 
 Velký krok u **daňových výkazů** a **banky**. Jádrem je nový `VatLedgerService` —
