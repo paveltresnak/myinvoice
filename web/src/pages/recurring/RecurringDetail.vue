@@ -249,6 +249,14 @@ async function removeAction() {
         <div class="bg-white border border-neutral-200 rounded-lg p-5 shadow-sm">
           <h3 class="text-xs font-semibold uppercase tracking-wide text-neutral-500 mb-3">{{ t('recurring.section_automation') }}</h3>
           <dl class="space-y-1.5 text-sm">
+            <div class="flex justify-between gap-2">
+              <dt class="text-neutral-500">{{ t('recurring.draft_open_mode') }}</dt>
+              <dd class="text-right">{{ t('recurring.draft_open_mode_' + (tpl.draft_open_mode ?? 'at_issue')) }}</dd>
+            </div>
+            <div v-if="tpl.draft_open_mode === 'period_start'" class="flex justify-between">
+              <dt class="text-neutral-500">{{ t('recurring.reminder_days_before') }}</dt>
+              <dd>{{ (tpl.reminder_days_before ?? 0) > 0 ? tpl.reminder_days_before : '—' }}</dd>
+            </div>
             <div class="flex justify-between"><dt class="text-neutral-500">{{ t('recurring.auto_issue') }}</dt><dd>{{ tpl.auto_issue ? '✓' : '—' }}</dd></div>
             <div class="flex justify-between"><dt class="text-neutral-500">{{ t('recurring.auto_send_email') }}</dt><dd>{{ tpl.auto_send_email ? '✓' : '—' }}</dd></div>
             <div class="flex justify-between"><dt class="text-neutral-500">{{ t('recurring.increment_month') }}</dt><dd>{{ tpl.increment_month_in_descriptions ? '✓' : '—' }}</dd></div>

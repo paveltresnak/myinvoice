@@ -307,6 +307,7 @@
     "draft_open_mode": "Kdy vytvořit koncept",
     "draft_open_mode_at_issue": "Až při vystavení (standardní)",
     "draft_open_mode_period_start": "Na začátku období (pro průběžný výkaz)",
+    "draft_open_mode_period_start_badge": "Otevřený koncept",
     "draft_open_mode_hint": "„Na začátku období\" otevře koncept 1. den fakturovaného měsíce, takže do něj můžete celý měsíc psát vícepráce ve výkazu práce. V den vystavení se koncept automaticky uzavře, vystaví a odešle (datum vystavení i DUZP = konec období).",
     "draft_open_mode_monthly_only": "„Na začátku období\" je dostupné jen pro měsíční periodicitu.",
     "period_start_requires_monthly": "Režim „Na začátku období\" lze použít jen u měsíční periodicity.",

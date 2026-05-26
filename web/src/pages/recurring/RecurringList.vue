@@ -176,6 +176,11 @@ function gotoClient(clientId: number) {
                 <button @click="gotoDetail(tpl.id)" class="cursor-pointer text-primary-700 font-medium hover:underline">
                   {{ tpl.name }}
                 </button>
+                <span v-if="tpl.draft_open_mode === 'period_start'"
+                  :title="t('recurring.draft_open_mode_period_start')"
+                  class="ml-1.5 inline-block align-middle text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 border border-primary-200 whitespace-nowrap">
+                  ↻ {{ t('recurring.draft_open_mode_period_start_badge') }}
+                </span>
               </td>
               <td class="px-4 py-3">
                 <button @click="gotoClient(tpl.client_id)" class="cursor-pointer text-neutral-700 hover:underline">
@@ -250,6 +255,11 @@ function gotoClient(clientId: number) {
               {{ freqLabel(tpl.frequency) }}<span v-if="tpl.end_of_month" class="text-neutral-400"> · EOM</span>
             </span>
             <span class="font-mono text-neutral-600">{{ formatDate(tpl.next_run_date) }}</span>
+          </div>
+          <div v-if="tpl.draft_open_mode === 'period_start'" class="mt-1">
+            <span class="inline-block text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 border border-primary-200">
+              ↻ {{ t('recurring.draft_open_mode_period_start_badge') }}
+            </span>
           </div>
           <div class="flex items-center justify-between gap-2 mt-1 text-xs text-neutral-500">
             <span v-if="tpl.last_run_date">

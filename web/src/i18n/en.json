@@ -307,6 +307,7 @@
     "draft_open_mode": "When to create the draft",
     "draft_open_mode_at_issue": "At issue time (standard)",
     "draft_open_mode_period_start": "At start of period (for ongoing work report)",
+    "draft_open_mode_period_start_badge": "Open draft",
     "draft_open_mode_hint": "„At start of period\" opens the draft on the 1st day of the billed month, so you can add extra work to the work report throughout the month. On the issue day the draft is automatically closed, issued and sent (issue date and tax date = end of period).",
     "draft_open_mode_monthly_only": "„At start of period\" is only available for monthly frequency.",
     "period_start_requires_monthly": "„At start of period\" mode can only be used with monthly frequency.",
