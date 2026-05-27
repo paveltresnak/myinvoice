@@ -419,6 +419,54 @@ XML;
         self::assertSame(1500.0, $result['invoices'][0]['items'][0]['unit_price_without_vat']);
     }
 
+    public function testOwnExportRoundTripDiscountAsNegativeLineIsPreserved(): void
+    {
+        // Round-trip ochrana: náš IsdocExporter slevu v % NEpromítá do ceny
+        // původních položek — materializuje ji jako samostatnou zápornou položku
+        // "Sleva 10 %" (InvoiceRepository::materializeDiscountLines). Re-import
+        // takového ISDOC musí obě řádky zachovat beze změny:
+        //   - běžná položka: LineExtensionAmount == UnitPrice × qty → ponechá UnitPrice
+        //   - slevová položka: qty 1, LineExtensionAmount == UnitPrice (záporné) → beze změny
+        // (oprava #48 se aktivuje jen při reálném rozdílu, který tu nenastane).
+        $ns = self::NS;
+        $xml = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="$ns">
+  <DocumentType>1</DocumentType>
+  <ID>2605099</ID>
+  <IssueDate>2026-05-01</IssueDate>
+  <LocalCurrencyCode>CZK</LocalCurrencyCode>
+  <CurrencyCode>CZK</CurrencyCode>
+  <AccountingSupplierParty><Party><PartyIdentification><ID>21370362</ID></PartyIdentification></Party></AccountingSupplierParty>
+  <AccountingCustomerParty><Party><PartyIdentification><ID>12345678</ID></PartyIdentification></Party></AccountingCustomerParty>
+  <InvoiceLines>
+    <InvoiceLine>
+      <InvoicedQuantity unitCode="hod">10</InvoicedQuantity>
+      <LineExtensionAmount>15000</LineExtensionAmount>
+      <UnitPrice>1500</UnitPrice>
+      <ClassifiedTaxCategory><Percent>21</Percent></ClassifiedTaxCategory>
+      <Item><Description>Konzultace</Description></Item>
+    </InvoiceLine>
+    <InvoiceLine>
+      <InvoicedQuantity unitCode="ks">1</InvoicedQuantity>
+      <LineExtensionAmount>-1500</LineExtensionAmount>
+      <UnitPrice>-1500</UnitPrice>
+      <ClassifiedTaxCategory><Percent>21</Percent></ClassifiedTaxCategory>
+      <Item><Description>Sleva 10 %</Description></Item>
+    </InvoiceLine>
+  </InvoiceLines>
+</Invoice>
+XML;
+        $items = $this->parser->parse($xml)['invoices'][0]['items'];
+        self::assertCount(2, $items);
+        // Běžná položka — plná cena beze změny.
+        self::assertSame('Konzultace', $items[0]['description']);
+        self::assertSame(1500.0, $items[0]['unit_price_without_vat']);
+        // Slevová položka — záporná cena beze změny.
+        self::assertSame('Sleva 10 %', $items[1]['description']);
+        self::assertSame(-1500.0, $items[1]['unit_price_without_vat']);
+    }
+
     public function testStreetNameWithoutBuildingNumberStaysIntact(): void
     {
         // Pokud zdrojový ISDOC od jiného systému posílá adresu v jednom poli
