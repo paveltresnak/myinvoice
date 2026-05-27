@@ -46,7 +46,7 @@ Vygenerované PDF obsahuje:
 8. **(EUR / cizí měna) Přepočet do CZK** — kurz ČNB + tabulka základů DPH a DPH v CZK (světle šedé podbarvení)
 9. **QR platbu** — vpravo dole (CZK SPAYD nebo EUR SEPA EPC)
 10. **Patičku** — text z Nastavení dodavatele (volitelný)
-11. **(volitelně) 2. strana** — Výkaz víceprací
+11. **(volitelně) 2. strana** — Výkaz víceprací. Pokud faktura výkaz má, položka „Výkaz víceprací" v tabulce položek je **proklikávací odkaz** (podtržená) — kliknutí přeskočí přímo na stránku s výkazem.
 
 ### 12.2.1 Přepočet do CZK (faktury v cizí měně)
 

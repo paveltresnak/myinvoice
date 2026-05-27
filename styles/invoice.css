@@ -391,3 +391,17 @@ table.bank-frame td {
 
 /* Stránkování — výkaz víceprací na nové straně */
 .page-break { page-break-before: always; }
+
+/* ─── VÝKAZ VÍCEPRACÍ ─── */
+/* Nadpis výkazu (byl inline ve šabloně — vytaženo do třídy kvůli branding override). */
+.wr-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #3B2D83;
+    margin-bottom: 1mm;
+}
+/* Proklikávací popis položky faktury → odkaz na stránku s výkazem (podtržený). */
+.wr-link {
+    color: #3B2D83;
+    text-decoration: underline;
+}

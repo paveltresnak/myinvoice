@@ -172,7 +172,22 @@
   <tbody>
     {% for item in invoice.items %}
     <tr{% if item.item_kind == 'discount' %} class="discount-row"{% endif %}>
-      <td>{{ item.description|nl2br }}</td>
+      {# Když má faktura výkaz víceprací, je proklikávací (podtržený) odkaz na stránku
+         s výkazem JEN položka výkazu — tj. ta, jejíž popis odpovídá názvu výkazu
+         (work_report.title), s pojistkou na klíčové slovo „výkaz" / „work report".
+         Ostatní položky i slevové řádky zůstávají běžným textem. mPDF dělá interní
+         skok na <a name="work-report">. #}
+      {%- set _wr_d = item.description|trim|lower -%}
+      {%- set _is_wr_item = work_report and item.item_kind != 'discount'
+            and (_wr_d == (work_report.title|default('')|trim|lower)
+                 or 'výkaz' in _wr_d or 'work report' in _wr_d) -%}
+      <td>
+        {%- if _is_wr_item -%}
+          <a href="#work-report" class="wr-link">{{ item.description|nl2br }}</a>
+        {%- else -%}
+          {{ item.description|nl2br }}
+        {%- endif -%}
+      </td>
       {% if item.item_kind == 'discount' %}
       <td></td><td></td><td></td>
       {% else %}
@@ -398,6 +413,8 @@
 {% if work_report %}
 {% set wr_has_dates = (work_report.items|filter(it => it.work_date)|length) > 0 %}
 <div class="page-break"></div>
+{# Cíl interního odkazu z položek faktury (mPDF named destination). #}
+<a name="work-report"></a>
 
 <table class="head">
   <tr>
@@ -418,7 +435,7 @@
 </table>
 
 <div style="margin-bottom:5mm;">
-  <div style="font-size:11pt;font-weight:bold;color:#3B2D83;margin-bottom:1mm;">{{ work_report.title }}</div>
+  <div class="wr-title">{{ work_report.title }}</div>
   <div style="font-size:9pt;color:#5A5470;">
     {{ t('K faktuře', 'For invoice') }} <span style="font-family:'DejaVu Sans Mono',monospace;">{{ invoice.varsymbol }}</span>
     {% if invoice.project_name %} · {{ t('Zakázka', 'Project') }}: {{ invoice.project_name }}{% endif %}
