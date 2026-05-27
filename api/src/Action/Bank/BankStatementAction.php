@@ -409,7 +409,7 @@ final class BankStatementAction
             return Json::error($response, 'not_found', 'Výpis nenalezen.', 404);
         }
 
-        $stmt = $this->db->pdo()->prepare('SELECT pdf_name, pdf_content FROM bank_statements WHERE id = ?');
+        $stmt = $this->db->pdo()->prepare('SELECT pdf_name, pdf_content, account_number FROM bank_statements WHERE id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row || $row['pdf_content'] === null || $row['pdf_content'] === '') {
@@ -417,6 +417,20 @@ final class BankStatementAction
         }
 
         $fileName = (string) ($row['pdf_name'] ?: ('vypis-' . $id . '.pdf'));
+        // Číslo účtu na začátek názvu, pokud tam ještě není — ať se stažené PDF
+        // z různých účtů nepletou (např. „2026-02.pdf" → „1000000005-2026-02.pdf").
+        // „Už obsahuje" testujeme i podle čistých číslic (formát s lomítkem/pomlčkou).
+        $account = trim((string) ($row['account_number'] ?? ''));
+        if ($account !== '') {
+            $acctDigits = preg_replace('/\D/', '', $account) ?? '';
+            $nameDigits = preg_replace('/\D/', '', $fileName) ?? '';
+            $alreadyHas = str_contains($fileName, $account)
+                || ($acctDigits !== '' && str_contains($nameDigits, $acctDigits));
+            $acctSafe = preg_replace('/[^A-Za-z0-9_-]/', '', $account) ?? '';
+            if (!$alreadyHas && $acctSafe !== '') {
+                $fileName = $acctSafe . '-' . $fileName;
+            }
+        }
         $safeName = preg_replace('/[\x00-\x1f"\\\\]/', '_', $fileName) ?? $fileName;
 
         $response->getBody()->write((string) $row['pdf_content']);
