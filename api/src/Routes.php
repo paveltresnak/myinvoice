@@ -47,6 +47,7 @@ use MyInvoice\Action\Settings\EmailBrandingAction;
 use MyInvoice\Action\Settings\SettingsAction;
 use MyInvoice\Action\Bank\BankStatementAction;
 use MyInvoice\Action\Dashboard\SummaryAction;
+use MyInvoice\Action\Dashboard\PurchaseSummaryAction;
 use MyInvoice\Action\Invoice\CancelInvoiceAction;
 use MyInvoice\Action\Invoice\CreateInvoiceAction;
 use MyInvoice\Action\Invoice\DeleteInvoiceAction;
@@ -282,7 +283,8 @@ final class Routes
         $app->post   ('/api/public/approval/{token:[a-f0-9]{32,128}}/decide',   PublicApprovalDecideAction::class);
 
         // Dashboard
-        $app->get ('/api/dashboard/summary',        SummaryAction::class);
+        $app->get ('/api/dashboard/summary',          SummaryAction::class);
+        $app->get ('/api/dashboard/purchase-summary', PurchaseSummaryAction::class);
 
         // Admin (M6)
         $app->get    ('/api/admin/activity-log',    ListActivityLogAction::class);
@@ -321,6 +323,8 @@ final class Routes
         $app->get    ('/api/crm/dso',               [CrmDashboardAction::class, 'dso']);
         $app->get    ('/api/crm/payment-punctuality', [CrmDashboardAction::class, 'punctuality']);
         $app->get    ('/api/crm/concentration',     [CrmDashboardAction::class, 'concentration']);
+        $app->get    ('/api/crm/vendor-concentration', [CrmDashboardAction::class, 'vendorConcentration']);
+        $app->get    ('/api/crm/dpo',               [CrmDashboardAction::class, 'dpo']);
         $app->get    ('/api/crm/expense-breakdown', [CrmDashboardAction::class, 'expenseBreakdown']);
         $app->get    ('/api/crm/churn-risk',        [CrmDashboardAction::class, 'churnRisk']);
         $app->get    ('/api/crm/action-items',      [CrmDashboardAction::class, 'actionItems']);

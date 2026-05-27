@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.6] — 2026-05-28
+
+Nová sekce **Náklady** ve Financích (statistiky a analýzy přijatých faktur, obdoba Tržeb) a rozšíření CRM o závazkové metriky.
+
+### Added
+
+- **Náklady** (*Finance → Náklady*) — přehled a analýzy nad přijatými fakturami, zrcadlí sekci *Tržby* pro stranu nákladů: plovoucí 12měsíční náklady, náklady letos/loni s meziročním srovnáním, odhad nákladů za aktuální rok (sezonalita + meziroční změna), počet přijatých faktur, aktivní dodavatelé, Ø doba úhrady dodavatelům, náklady za posledních 30 dní a nezaplacené závazky. Dále měsíční náklady (graf + loňská řada), kumulativní platby dodavatelům, top dodavatelé (koláč i tabulka za 12 měsíců), rozpad stavů přijatých faktur, rozpad DPH na vstupu podle sazby, náklady po rocích a měsících, rozpad nákladů podle kategorií, **riziko koncentrace dodavatelů**, distribuce doby úhrady, **plán plateb dodavatelům** (splatné závazky do 30 / 60 / 90 dní), aging závazků a distribuce velikosti přijatých faktur. Respektuje plátcovství DPH (náklad bez / s DPH) a řadí podle pozdějšího z dat DUZP / vystavení.
+- **CRM — závazkové metriky:** **DPO** (průměrná doba úhrady dodavatelům, protějšek DSO), **koncentrace dodavatelů** (závislost na top dodavatelích) a **pracovní kapitálový cyklus** (DSO − DPO — zda financujete provoz, nebo vás financují dodavatelé).
+
 ## [4.3.5] — 2026-05-27
 
 Měsíční daňový export do jednoho ZIPu, oprava zařazení přijatých faktur do období DPH a doladění filtrů v seznamech.

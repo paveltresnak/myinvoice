@@ -499,6 +499,75 @@ final class CrmAggregationService
     }
 
     /**
+     * Vendor concentration risk — % nákladů z top dodavatele.
+     * Analogie clientConcentration(), ale nad přijatými fakturami (závislost na dodavateli).
+     *
+     * @return array{top1_share: float, top3_share: float, top5_share: float, total_vendors: int,
+     *               pareto_80_count: int, risk_level: string, currency: string}
+     */
+    public function vendorConcentration(int $supplierId, int $monthsBack = 12, ?string $currency = null): array
+    {
+        $vendors = $this->topVendors($supplierId, $monthsBack, 50, $currency);
+        if (empty($vendors)) {
+            return ['top1_share' => 0, 'top3_share' => 0, 'top5_share' => 0, 'total_vendors' => 0,
+                    'pareto_80_count' => 0, 'risk_level' => 'low', 'currency' => 'CZK'];
+        }
+        $cur = $vendors[0]['currency'];
+
+        $top1 = $vendors[0]['percent_share'] ?? 0;
+        $top3 = array_sum(array_slice(array_column($vendors, 'percent_share'), 0, 3));
+        $top5 = array_sum(array_slice(array_column($vendors, 'percent_share'), 0, 5));
+
+        // Pareto — kolik dodavatelů dělá 80 % nákladů
+        $pareto80 = 0;
+        $cumul = 0;
+        foreach ($vendors as $v) {
+            $cumul += $v['percent_share'];
+            $pareto80++;
+            if ($cumul >= 80) break;
+        }
+
+        $riskLevel = $top1 > 40 ? 'high' : ($top1 > 25 ? 'medium' : 'low');
+
+        return [
+            'top1_share'      => round($top1, 1),
+            'top3_share'      => round($top3, 1),
+            'top5_share'      => round($top5, 1),
+            'total_vendors'   => count($vendors),
+            'pareto_80_count' => $pareto80,
+            'risk_level'      => $riskLevel,
+            'currency'        => $cur,
+        ];
+    }
+
+    /**
+     * DPO (Days Payable Outstanding) za posledních N měsíců.
+     * Průměrný počet dní mezi vystavením přijaté faktury a její úhradou dodavateli.
+     * Doplněk k DSO — spolu dávají pracovní kapitálový cyklus (DSO − DPO).
+     *
+     * @return array{avg_days: float, sample_size: int, period_months: int}
+     */
+    public function daysPayableOutstanding(int $supplierId, int $monthsBack = 12): array
+    {
+        $start = (new \DateTimeImmutable())->modify('-' . $monthsBack . ' months')->format('Y-m-d');
+        $stmt = $this->db->pdo()->prepare(
+            "SELECT AVG(DATEDIFF(paid_at, issue_date)) AS avg_days, COUNT(*) AS sample
+               FROM purchase_invoices
+              WHERE supplier_id = ?
+                AND status = 'paid'
+                AND paid_at IS NOT NULL
+                AND issue_date >= ?"
+        );
+        $stmt->execute([$supplierId, $start]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        return [
+            'avg_days'      => round((float) ($row['avg_days'] ?? 0), 1),
+            'sample_size'   => (int) ($row['sample'] ?? 0),
+            'period_months' => $monthsBack,
+        ];
+    }
+
+    /**
      * Expense breakdown po kategoriích (vyžaduje expense_categories assignment).
      *
      * @return list<array{category_id:?int, code:?string, label:?string, total:float, count:int, percent:float}>

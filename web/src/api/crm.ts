@@ -92,6 +92,16 @@ export interface ConcentrationResult {
   currency: string
 }
 
+export interface VendorConcentrationResult {
+  top1_share: number
+  top3_share: number
+  top5_share: number
+  total_vendors: number
+  pareto_80_count: number
+  risk_level: 'low' | 'medium' | 'high'
+  currency: string
+}
+
 export interface ExpenseCategoryRow {
   category_id: number | null
   code: string | null
@@ -131,6 +141,10 @@ export const crmApi = {
     api.get<PunctualityResult>('/crm/payment-punctuality', { params: { months } }).then(r => r.data),
   concentration: (months = 12, currency?: string) =>
     api.get<ConcentrationResult>('/crm/concentration', { params: { months, currency } }).then(r => r.data),
+  vendorConcentration: (months = 12, currency?: string) =>
+    api.get<VendorConcentrationResult>('/crm/vendor-concentration', { params: { months, currency } }).then(r => r.data),
+  dpo: (months = 12) =>
+    api.get<DsoResult>('/crm/dpo', { params: { months } }).then(r => r.data),
   expenseBreakdown: (months = 12, currency?: string) =>
     api.get<ExpenseCategoryRow[]>('/crm/expense-breakdown', { params: { months, currency } }).then(r => r.data),
   churnRisk: (days = 60, limit = 20) =>

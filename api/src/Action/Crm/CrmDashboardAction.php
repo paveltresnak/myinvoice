@@ -115,6 +115,22 @@ final class CrmDashboardAction
         return Json::ok($response, $this->crm->expenseBreakdown($supplierId, $months, $currency));
     }
 
+    public function vendorConcentration(Request $request, Response $response): Response
+    {
+        $supplierId = SupplierGuard::currentId($request);
+        $q = $request->getQueryParams();
+        $months = max(1, min(36, (int) ($q['months'] ?? 12)));
+        $currency = isset($q['currency']) ? (string) $q['currency'] : null;
+        return Json::ok($response, $this->crm->vendorConcentration($supplierId, $months, $currency));
+    }
+
+    public function dpo(Request $request, Response $response): Response
+    {
+        $supplierId = SupplierGuard::currentId($request);
+        $months = max(1, min(36, (int) ($request->getQueryParams()['months'] ?? 12)));
+        return Json::ok($response, $this->crm->daysPayableOutstanding($supplierId, $months));
+    }
+
     public function churnRisk(Request $request, Response $response): Response
     {
         $supplierId = SupplierGuard::currentId($request);

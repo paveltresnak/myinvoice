@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { crmApi, type CrmOverview, type CrmMonthlyRow, type TopClient, type TopVendor,
   type AgingBucket, type DsoResult, type PunctualityResult, type ConcentrationResult,
+  type VendorConcentrationResult,
   type ExpenseCategoryRow, type ChurnRiskClient,
   type ActionItemsResult, type CashFlowResult, type LateRiskClient,
   type ReminderEffectiveness, type PaymentTimeHistogram, type CrmYearlyRow } from '@/api/crm'
@@ -26,6 +27,8 @@ const agingPay  = ref<AgingBucket[]>([])
 const dso = ref<DsoResult | null>(null)
 const punctuality = ref<PunctualityResult | null>(null)
 const concentration = ref<ConcentrationResult | null>(null)
+const vendorConcentration = ref<VendorConcentrationResult | null>(null)
+const dpo = ref<DsoResult | null>(null)
 const expenses = ref<ExpenseCategoryRow[]>([])
 const churn = ref<ChurnRiskClient[]>([])
 const actionItems = ref<ActionItemsResult | null>(null)
@@ -79,7 +82,7 @@ async function loadAll() {
   loading.value = true
   try {
     const cur = currencyFilter.value || undefined
-    const [ov, mo, yr, tc, tv, ar, ap, d, p, conc, exp, ch, ai, cf, lr, re, ph] = await Promise.all([
+    const [ov, mo, yr, tc, tv, ar, ap, d, p, conc, vc, dp, exp, ch, ai, cf, lr, re, ph] = await Promise.all([
       crmApi.overview(),
       crmApi.monthly(periodMonths.value, cur),
       crmApi.yearly(cur),
@@ -90,6 +93,8 @@ async function loadAll() {
       crmApi.dso(periodMonths.value),
       crmApi.punctuality(periodMonths.value),
       crmApi.concentration(periodMonths.value, cur),
+      crmApi.vendorConcentration(periodMonths.value, cur),
+      crmApi.dpo(periodMonths.value),
       crmApi.expenseBreakdown(periodMonths.value, cur),
       crmApi.churnRisk(60, 10),
       crmApi.actionItems(),
@@ -108,6 +113,8 @@ async function loadAll() {
     dso.value = d
     punctuality.value = p
     concentration.value = conc
+    vendorConcentration.value = vc
+    dpo.value = dp
     expenses.value = exp
     churn.value = ch
     actionItems.value = ai
@@ -208,6 +215,14 @@ function formatMonthLabel(period: string): string {
   const date = new Date(Number(y), Number(m) - 1, 1)
   return date.toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' })
 }
+
+// Pracovní kapitálový cyklus = DSO − DPO. Kladné = financuješ provoz (inkasuješ pomaleji než platíš),
+// záporné = dodavatelé tě financují (platíš později, než ti platí klienti).
+const wcCycle = computed<number | null>(() => {
+  if (!dso.value || !dpo.value) return null
+  if (dso.value.sample_size === 0 && dpo.value.sample_size === 0) return null
+  return Math.round((dso.value.avg_days - dpo.value.avg_days) * 10) / 10
+})
 
 watch([periodMonths, currencyFilter], () => {
   if (currencyFilter.value) loadAll()
@@ -620,6 +635,54 @@ onMounted(loadAll)
           </div>
           <div class="text-xs mt-2 pt-2 border-t border-neutral-100" :class="riskColor(concentration?.risk_level || 'low')">
             {{ t('crm.concentration.risk_' + (concentration?.risk_level || 'low')) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Health metrics row 2: DPO + Vendor concentration + Working capital cycle ═══ -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- DPO -->
+        <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-5">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-1">
+            {{ t('crm.dpo.title') }}
+          </div>
+          <div class="text-2xl font-bold font-mono text-neutral-900">
+            {{ dpo?.avg_days ?? '—' }}<span class="text-base text-neutral-500 ml-1">{{ t('crm.dso.days') }}</span>
+          </div>
+          <div class="text-xs text-neutral-500 mt-1">{{ t('crm.dpo.hint', { n: dpo?.sample_size || 0 }) }}</div>
+        </div>
+
+        <!-- Vendor concentration risk -->
+        <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-5">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-1">
+            {{ t('crm.vendor_concentration.title') }}
+          </div>
+          <div class="text-2xl font-bold font-mono" :class="riskColor(vendorConcentration?.risk_level || 'low')">
+            {{ vendorConcentration?.top1_share ?? 0 }}%
+          </div>
+          <div class="text-xs text-neutral-500 mt-1">
+            {{ t('crm.vendor_concentration.top1', { pct: vendorConcentration?.top1_share ?? 0 }) }}
+            <span class="ml-2">· {{ t('crm.vendor_concentration.pareto', { n: vendorConcentration?.pareto_80_count ?? 0 }) }}</span>
+          </div>
+          <div class="text-xs mt-2 pt-2 border-t border-neutral-100" :class="riskColor(vendorConcentration?.risk_level || 'low')">
+            {{ t('crm.vendor_concentration.risk_' + (vendorConcentration?.risk_level || 'low')) }}
+          </div>
+        </div>
+
+        <!-- Working capital cycle (DSO − DPO) -->
+        <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-5">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-1">
+            {{ t('crm.wc_cycle.title') }}
+          </div>
+          <div class="text-2xl font-bold font-mono"
+            :class="wcCycle === null ? 'text-neutral-400' : wcCycle > 0 ? 'text-warning-600' : 'text-success-600'">
+            <template v-if="wcCycle !== null">{{ wcCycle > 0 ? '+' : '' }}{{ wcCycle }}<span class="text-base text-neutral-500 ml-1">{{ t('crm.dso.days') }}</span></template>
+            <template v-else>—</template>
+          </div>
+          <div class="text-xs text-neutral-500 mt-1">{{ t('crm.wc_cycle.formula') }}</div>
+          <div v-if="wcCycle !== null" class="text-xs mt-2 pt-2 border-t border-neutral-100"
+            :class="wcCycle > 0 ? 'text-warning-600' : 'text-success-600'">
+            {{ wcCycle > 0 ? t('crm.wc_cycle.positive') : t('crm.wc_cycle.negative') }}
           </div>
         </div>
       </div>
