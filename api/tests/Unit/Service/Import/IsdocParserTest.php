@@ -370,6 +370,55 @@ XML;
         self::assertSame(2520.0, $item['unit_price_without_vat']);
     }
 
+    public function testLocalCurrencyDiscountReadFromLineExtensionAmount(): void
+    {
+        // issue #48: iDoklad u slevy ponechá <UnitPrice> na plné (před-slevové)
+        // ceně a slevu promítne jen do <LineExtensionAmount>. Parser musí
+        // importovat sníženou efektivní cenu, jinak je součet faktury chybný.
+        // Příklad: 1 ks, plná cena 1000, sleva 10 % → LineExtensionAmount 900.
+        $xml = str_replace(
+            '<UnitPrice>1500</UnitPrice>',
+            '<LineExtensionAmount>900</LineExtensionAmount><UnitPrice>1000</UnitPrice>',
+            str_replace(
+                '<InvoicedQuantity unitCode="hod">10</InvoicedQuantity>',
+                '<InvoicedQuantity unitCode="ks">1</InvoicedQuantity>',
+                $this->minimalIsdoc()
+            )
+        );
+        $result = $this->parser->parse($xml);
+        self::assertSame(900.0, $result['invoices'][0]['items'][0]['unit_price_without_vat']);
+    }
+
+    public function testLocalCurrencyDiscountWithMultipleQuantity(): void
+    {
+        // 4 ks, plná jedn. cena 250 (LineExtensionAmount bez slevy by bylo 1000),
+        // sleva → LineExtensionAmount 750 ⇒ efektivní jedn. cena 187.50.
+        $xml = str_replace(
+            '<UnitPrice>1500</UnitPrice>',
+            '<LineExtensionAmount>750</LineExtensionAmount><UnitPrice>250</UnitPrice>',
+            str_replace(
+                '<InvoicedQuantity unitCode="hod">10</InvoicedQuantity>',
+                '<InvoicedQuantity unitCode="ks">4</InvoicedQuantity>',
+                $this->minimalIsdoc()
+            )
+        );
+        $result = $this->parser->parse($xml);
+        self::assertSame(187.5, $result['invoices'][0]['items'][0]['unit_price_without_vat']);
+    }
+
+    public function testLocalCurrencyNoDiscountKeepsUnitPrice(): void
+    {
+        // Bez slevy: LineExtensionAmount == UnitPrice × qty → ponecháme <UnitPrice>
+        // beze změny (žádný zaokrouhlovací drift z dělení). 10 hod × 1500 = 15000.
+        $xml = str_replace(
+            '<UnitPrice>1500</UnitPrice>',
+            '<LineExtensionAmount>15000</LineExtensionAmount><UnitPrice>1500</UnitPrice>',
+            $this->minimalIsdoc()
+        );
+        $result = $this->parser->parse($xml);
+        self::assertSame(1500.0, $result['invoices'][0]['items'][0]['unit_price_without_vat']);
+    }
+
     public function testStreetNameWithoutBuildingNumberStaysIntact(): void
     {
         // Pokud zdrojový ISDOC od jiného systému posílá adresu v jednom poli

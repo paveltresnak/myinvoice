@@ -192,20 +192,39 @@ final class IsdocParser
         $quantity = $qtyEl instanceof \DOMElement ? (float) $qtyEl->textContent : 1.0;
         $unit = $qtyEl instanceof \DOMElement ? ($qtyEl->getAttribute('unitCode') ?: 'ks') : 'ks';
 
+        $unitPriceLocal = (float) ($this->text($xpath, 'i:UnitPrice', $line) ?: '0');
+
+        // <LineExtensionAmount> = celková částka řádku bez DPH PO slevě. ISDOC 6.0.x
+        // nemá na řádce dedikovaný discount element — sleva se promítá jen tím, že
+        // LineExtensionAmount < UnitPrice × množství. iDoklad takhle exportuje i
+        // dokladovou slevu (DiscountType=OnDocument), kterou rozpočítá do řádků.
+        // Když efektivní jednotková cena (LineExtensionAmount / qty) nesedí na
+        // <UnitPrice>, je v řádce sleva a musíme importovat sníženou cenu — jinak
+        // se faktura naimportuje za plnou (před-slevovou) cenu a součet je chybný
+        // (issue #48: import z iDokladu přes PDF s embedded ISDOC ignoroval slevu).
         if ($hasForeignCurrency) {
             // <UnitPrice> je dle ISDOC vždy v lokální měně (CZK), ne v měně faktury.
-            // Cizoměnovou jednotkovou cenu odvodíme z <LineExtensionAmountCurr> / qty.
-            // Náš IsdocExporter Curr pole generuje (od fixu cizí měny); fallback na
-            // <UnitPrice> drží pro non-konformní exporty cizích systémů, které *Curr
-            // vynechají a cizí hodnotu (chybně) zapíšou rovnou do <UnitPrice>.
+            // Cizoměnovou jednotkovou cenu (už po slevě) odvodíme z
+            // <LineExtensionAmountCurr> / qty. Náš IsdocExporter Curr pole generuje
+            // (od fixu cizí měny); fallback na <UnitPrice> drží pro non-konformní
+            // exporty cizích systémů, které *Curr vynechají a cizí hodnotu (chybně)
+            // zapíšou rovnou do <UnitPrice>.
             $lineAmountCurr = $this->text($xpath, 'i:LineExtensionAmountCurr', $line);
-            if ($lineAmountCurr !== '' && $quantity > 0.0) {
-                $unitPrice = (float) $lineAmountCurr / $quantity;
-            } else {
-                $unitPrice = (float) ($this->text($xpath, 'i:UnitPrice', $line) ?: '0');
-            }
+            $unitPrice = ($lineAmountCurr !== '' && $quantity > 0.0)
+                ? (float) $lineAmountCurr / $quantity
+                : $unitPriceLocal;
         } else {
-            $unitPrice = (float) ($this->text($xpath, 'i:UnitPrice', $line) ?: '0');
+            $unitPrice = $unitPriceLocal;
+            $lineAmount = $this->text($xpath, 'i:LineExtensionAmount', $line);
+            if ($lineAmount !== '' && $quantity > 0.0) {
+                $effective = (float) $lineAmount / $quantity;
+                // Přepsat jen při reálném rozdílu (= je tam sleva); u nediskontovaných
+                // řádků ponecháme původní <UnitPrice>, ať dělením nezanášíme
+                // zaokrouhlovací drift.
+                if (abs($effective - $unitPriceLocal) > 0.005) {
+                    $unitPrice = $effective;
+                }
+            }
         }
 
         $vatRate = (float) ($this->text($xpath, 'i:ClassifiedTaxCategory/i:Percent', $line) ?: '0');
