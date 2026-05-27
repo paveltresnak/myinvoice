@@ -121,7 +121,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  version: { type: string, example: "3.3.1" }
+                  version: { type: string, example: "4.3.1" }
 
   /api/v1/auth/api-me:
     get:
@@ -781,6 +781,11 @@ paths:
         pomocí query parametru `?force=1` (bez ohledu na status).
 
         Suma `total_hours` a `total_amount` se přepočítá ze `items` na serveru.
+
+        **Pozor:** výkaz víceprací je samostatná entita — ukládá se jen jako
+        příloha (2. strana PDF) a **NEmění položky ani částku faktury**. Pokud chceš
+        práci i vyúčtovat, přidej odpovídající položku faktury zvlášť přes
+        `PUT /api/v1/invoices/{id}` (úprava `items`). Obojí lze dělat jen u draftu.
       parameters:
         - in: query
           name: force
@@ -3106,6 +3111,7 @@ components:
         rounding: { type: number, format: float, description: "Zaokrouhlení (CZK)" }
         advance_paid_amount: { type: number, format: float, description: "Záloha k odečtení (u faktury vystavované po proforme)" }
         amount_to_pay: { type: number, format: float, description: "total_with_vat + rounding − advance_paid_amount" }
+        discount_percent: { type: number, format: float, description: "Procentuální sleva z celé faktury (0 = žádná). Materializuje se jako záporná položka „Sleva X %\" v `items`." }
         totals:
           type: object
           description: "Agregát pro renderování — duplikuje stejné hodnoty co výše"
@@ -3116,6 +3122,8 @@ components:
             rounding: { type: number, format: float }
             advance_paid_amount: { type: number, format: float }
             amount_to_pay: { type: number, format: float }
+            discount_percent: { type: number, format: float, description: "Procentuální sleva z celé faktury (0 = žádná)" }
+            discount_amount: { type: number, format: float, description: "Kladná peněžní hodnota slevy (= součet záporných slevových položek)" }
         vat_breakdown:
           type: array
           description: "Per-sazba rozpad DPH (vstup pro QR + PDF)"
@@ -3188,6 +3196,17 @@ components:
           nullable: true
           description: "Volitelný manuální override automatického číslování. U draftu lze ponechat null — číslo se přidělí při /issue."
         advance_paid_amount: { type: number, format: float, default: 0, description: "Záloha k odečtení od total_with_vat" }
+        discount_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: |
+            Procentuální sleva z celé faktury (0–100). Při uložení se materializuje jako
+            záporná položka „Sleva X %" rozpadlá na každou sazbu DPH zvlášť (proto se
+            správně propíše do DPH rozpisu i daňových výkazů). Slevovou položku
+            NEposílej ručně v `items` — generuje se z tohoto pole.
         payment_method:
           type: string
           enum: [bank_transfer, card, cash, other]
@@ -3353,9 +3372,9 @@ components:
         description: { type: string, example: "Analýza požadavků a tech-spec" }
         hours: { type: number, format: float, example: 8.5 }
         rate:  { type: number, format: float, example: 1500 }
-        amount: { type: number, format: float, example: 12750, description: hours × rate }
+        total_amount: { type: number, format: float, example: 12750, description: hours × rate }
         order_index: { type: integer, example: 1 }
-        performed_on: { type: string, format: date, nullable: true }
+        work_date: { type: string, format: date, nullable: true, description: "Datum provedení úkonu (volitelné)" }
 
     WorkReportItemInput:
       type: object
@@ -3365,7 +3384,7 @@ components:
         hours: { type: number, format: float, minimum: 0 }
         rate:  { type: number, format: float, minimum: 0 }
         order_index: { type: integer }
-        performed_on: { type: string, format: date }
+        work_date: { type: string, format: date, description: "Datum provedení úkonu (volitelné, YYYY-MM-DD)" }
 
     WorkReport:
       type: object
@@ -3910,6 +3929,11 @@ components:
         total_without_vat: { type: number, format: float }
         total_vat: { type: number, format: float }
         total_with_vat: { type: number, format: float }
+        item_kind:
+          type: string
+          enum: [standard, discount]
+          default: standard
+          description: "`discount` = systémově vygenerovaný záporný řádek „Sleva X %\" z `discount_percent` faktury (po sazbách DPH). Needituj ho ručně."
         order_index: { type: integer }
         linked_work_report_id: { type: integer, nullable: true }
 
@@ -3960,6 +3984,12 @@ components:
           enum: [bank_transfer, card, cash, other]
         reverse_charge: { type: boolean }
         payment_due_days: { type: integer }
+        discount_percent: { type: number, format: float, description: "Procentuální sleva (0–100) zděděná na každou vygenerovanou fakturu." }
+        draft_open_mode:
+          type: string
+          enum: [at_issue, period_start]
+          description: "at_issue = koncept vznikne až v den vystavení; period_start = koncept se otevře na začátku období (průběžný výkaz víceprací) a vystaví se na konci."
+        reminder_days_before: { type: integer, description: "0–14; připomenutí konceptu N dní před vystavením (0 = vypnuto; jen pro period_start)." }
         note_above_items: { type: string, nullable: true }
         note_below_items: { type: string, nullable: true }
         increment_month_in_descriptions:
@@ -3975,6 +4005,8 @@ components:
           type: string
           enum: [active, paused, expired]
         invoices_generated_count: { type: integer }
+        last_error: { type: string, nullable: true, description: "Poslední chyba generování (cron) — UI ji ukáže jako banner u šablony; vyčistí se po úspěšném ručním běhu." }
+        last_error_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string }
         updated_at: { type: string }
         items:
@@ -4021,6 +4053,29 @@ components:
           default: bank_transfer
         reverse_charge: { type: boolean, default: false }
         payment_due_days: { type: integer, default: 14 }
+        discount_percent:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: "Procentuální sleva z celé faktury (0–100); zdědí ji každá vygenerovaná faktura (materializuje se jako záporná položka „Sleva X %\")."
+        draft_open_mode:
+          type: string
+          enum: [at_issue, period_start]
+          default: at_issue
+          description: "period_start (koncept na začátku období → vystavení na konci) vyžaduje auto_issue=true."
+        tax_date_mode:
+          type: string
+          enum: [same_as_issue, previous_month_last_day]
+          default: same_as_issue
+          description: "DUZP vygenerované faktury: stejné jako datum vystavení, nebo poslední den předchozího měsíce."
+        reminder_days_before:
+          type: integer
+          minimum: 0
+          maximum: 14
+          default: 0
+          description: "Připomenutí konceptu N dní před vystavením (jen draft_open_mode=period_start; 0 = vypnuto)."
         note_above_items: { type: string, nullable: true }
         note_below_items: { type: string, nullable: true }
         increment_month_in_descriptions: { type: boolean, default: true }
