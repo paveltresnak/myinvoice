@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.11] — 2026-05-28
+
+Propojení přijatých záloh s vyúčtovací fakturou (proti dvojímu započtení nákladu) a dotažení daňového auditu výkazů DPH.
+
+### Added
+
+- **Propojení přijaté zálohy s finální fakturou** — v detailu přijaté faktury lze zálohovou fakturu (zálohu / proformu) spárovat s vyúčtovací fakturou od stejného dodavatele (*Zálohová faktura → Spárovat se zálohou*). Nabídka kandidátů řadí napřed zálohy ve stejné měně a s nejbližší částkou (porovnává hrubou částku před odečtem zálohy, ne částku k úhradě). Spárovaná — nebo už zaplacená — záloha přestane vstupovat do Nákladů, CRM statistik i daně z příjmů, takže se stejný náklad nepočítá dvakrát. (migrace `0064`, `0065`)
+- **AI návrh propojení zálohy** — když AI extrakce přijaté faktury najde odkaz na zaplacenou zálohu („zaplaceno zálohou č. X"), dohledá odpovídající zálohu a v detailu ji nabídne k potvrzení (návrh, nic se nepáruje automaticky).
+
+### Fixed
+
+- **Přijatá zálohová faktura (proforma) ve výkazech DPH** — záloha (`advance`) není daňový doklad, přesto vstupovala do Knihy DPH, DPH přiznání, kontrolního i souhrnného hlášení. Nově je z DPH evidence vyloučená (symetricky k vystavené proformě), NULL-safe (legacy doklady bez vyplněného druhu zůstávají).
+- **Samovyměření daně u dovozu služby/zboží** — kódy `24` (přijetí služby z EU / dovoz služby) a `25` (dovoz zboží ze 3. země) neměly příznak reverse-charge, takže se daň samovyměřila jen při ručním zaškrtnutí RC na dokladu. Nově se samovyměří z klasifikačního kódu (jako kódy 5/23), včetně zrcadlového odpočtu na ř. 43. (migrace `0063`)
+- **„Bez nároku na odpočet" (kód 42) nárokoval odpočet** — kód byl chybně mapován na ř. 42 DPHDP3 (odpočet při dovozu přes celní úřad). Plnění bez nároku správně nevstupuje do žádného odpočtového řádku ani do KH / Knihy DPH.
+- **Osvobozené tuzemské plnění (kód 3) korumpovalo ř. 3** — bylo mapováno na ř. 3 DPHDP3 (pořízení zboží z JČS, vstup), takže osvobozené vystavené plnění nadhodnocovalo pořízení z EU. Nově se do výkazu nezahrnuje (osvobozená plnění / koeficient § 76 se řeší ručně).
+- **Daň z příjmů — zálohy v nákladech** — přijatá záloha (`advance`) se napevno vylučuje z uznatelných nákladů DPFO/DPPO (není daňový doklad; nákladem je až vyúčtovací faktura).
+
+### Changed
+
+- **DPH přiznání (DPHDP3) — rekapitulace (Veta6)** — generuje se i souhrnný oddíl ř. 62–66 (daň na výstupu, odpočet, vlastní daň / nadměrný odpočet), sčítaný ze zaokrouhlených řádků kvůli konzistenci s detailem (EPO).
+- **Náklady / CRM — vyloučení spárovaných/zaplacených záloh** — nákladové souhrny, top dodavatelé a měsíční/roční přehledy nepočítají zálohy, které jsou zaplacené nebo spárované s finální fakturou; cashflow a závazky je ponechávají (nezaplacená záloha je reálný závazek).
+
 ## [4.3.10] — 2026-05-28
 
 Zadávání částek s DPH na řádku faktury a oprava pádu Přehledu při neúplné odpovědi.

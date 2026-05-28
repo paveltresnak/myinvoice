@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { purchaseInvoicesApi, type PurchaseInvoice, type PurchaseInvoiceStatus } from '@/api/purchaseInvoices'
+import { purchaseInvoicesApi, type PurchaseInvoice, type PurchaseInvoiceStatus, type PurchaseInvoiceBrief } from '@/api/purchaseInvoices'
 import { formatMoney, formatDate } from '@/composables/useFormat'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth'
@@ -30,6 +30,65 @@ async function dismissWarning() {
     toast.error(apiErrorMessage(e))
   } finally {
     dismissingWarning.value = false
+  }
+}
+
+// ── Propojení se zálohovou fakturou (advance) — proti dvojímu započtení nákladu ──
+const advanceModalOpen = ref(false)
+const advanceCandidates = ref<PurchaseInvoiceBrief[]>([])
+const loadingCandidates = ref(false)
+const linkingAdvance = ref(false)
+
+async function openAdvanceModal() {
+  if (!invoice.value) return
+  advanceModalOpen.value = true
+  loadingCandidates.value = true
+  try {
+    advanceCandidates.value = await purchaseInvoicesApi.advanceCandidates(invoice.value.id)
+  } catch (e) {
+    toast.error(apiErrorMessage(e))
+  } finally {
+    loadingCandidates.value = false
+  }
+}
+
+async function linkAdvance(advanceId: number) {
+  if (!invoice.value || linkingAdvance.value) return
+  linkingAdvance.value = true
+  try {
+    invoice.value = await purchaseInvoicesApi.linkAdvance(invoice.value.id, advanceId)
+    advanceModalOpen.value = false
+    toast.success(t('purchase_invoice.advance_link.linked'))
+  } catch (e) {
+    toast.error(apiErrorMessage(e))
+  } finally {
+    linkingAdvance.value = false
+  }
+}
+
+async function unlinkAdvance() {
+  if (!invoice.value || linkingAdvance.value) return
+  if (!confirm(t('purchase_invoice.advance_link.unlink_confirm'))) return
+  linkingAdvance.value = true
+  try {
+    invoice.value = await purchaseInvoicesApi.unlinkAdvance(invoice.value.id)
+    toast.success(t('purchase_invoice.advance_link.unlinked'))
+  } catch (e) {
+    toast.error(apiErrorMessage(e))
+  } finally {
+    linkingAdvance.value = false
+  }
+}
+
+async function dismissAdvanceSuggestion() {
+  if (!invoice.value || linkingAdvance.value) return
+  linkingAdvance.value = true
+  try {
+    invoice.value = await purchaseInvoicesApi.dismissAdvanceSuggestion(invoice.value.id)
+  } catch (e) {
+    toast.error(apiErrorMessage(e))
+  } finally {
+    linkingAdvance.value = false
   }
 }
 
@@ -449,6 +508,91 @@ function transitionLabel(target: PurchaseInvoiceStatus): string {
             </div>
           </template>
         </dl>
+      </div>
+    </div>
+
+    <!-- ═══ Propojení se zálohovou fakturou (advance) ═══ -->
+    <div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-5">
+      <h3 class="text-sm font-medium text-neutral-700 mb-3">{{ t('purchase_invoice.advance_link.title') }}</h3>
+
+      <!-- Tento doklad JE záloha → reverzní pohled (kdo ji vyúčtovává) -->
+      <template v-if="invoice.document_kind === 'advance'">
+        <div v-if="invoice.settled_by" class="text-sm">
+          {{ t('purchase_invoice.advance_link.settled_by') }}
+          <RouterLink :to="`/purchase-invoices/${invoice.settled_by.id}`" class="text-primary-700 hover:underline font-mono">
+            {{ invoice.settled_by.varsymbol || invoice.settled_by.vendor_invoice_number || ('#' + invoice.settled_by.id) }}
+          </RouterLink>
+        </div>
+        <div v-else class="text-sm text-neutral-500">{{ t('purchase_invoice.advance_link.not_settled') }}</div>
+      </template>
+
+      <!-- Finální faktura → spárováno / AI návrh / párovat -->
+      <template v-else>
+        <div v-if="invoice.linked_advance" class="flex items-center justify-between gap-3 text-sm">
+          <div>
+            {{ t('purchase_invoice.advance_link.linked_to') }}
+            <RouterLink :to="`/purchase-invoices/${invoice.linked_advance.id}`" class="text-primary-700 hover:underline font-mono">
+              {{ invoice.linked_advance.varsymbol || invoice.linked_advance.vendor_invoice_number || ('#' + invoice.linked_advance.id) }}
+            </RouterLink>
+            <span class="text-neutral-500 font-mono">(−{{ formatMoney(invoice.linked_advance.total_with_vat, invoice.linked_advance.currency) }})</span>
+          </div>
+          <button v-if="auth.canWrite" type="button" @click="unlinkAdvance" :disabled="linkingAdvance"
+            class="cursor-pointer text-xs px-2 py-1 border border-neutral-300 rounded text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 shrink-0">
+            {{ t('purchase_invoice.advance_link.unlink') }}
+          </button>
+        </div>
+
+        <div v-else-if="invoice.advance_link_suggestion" class="p-3 bg-primary-50 border border-primary-500/30 rounded-md flex gap-3 items-start">
+          <div class="text-sm flex-1 min-w-0">
+            <div class="font-medium text-primary-700">{{ t('purchase_invoice.advance_link.ai_suggestion_title') }}</div>
+            <div class="text-neutral-600 mt-1">
+              {{ t('purchase_invoice.advance_link.ai_suggestion_body') }}
+              <span class="font-mono">{{ invoice.advance_link_suggestion.varsymbol || invoice.advance_link_suggestion.vendor_invoice_number || ('#' + invoice.advance_link_suggestion.id) }}</span>
+              <span class="text-neutral-500 font-mono">({{ formatMoney(invoice.advance_link_suggestion.total_with_vat, invoice.advance_link_suggestion.currency) }})</span>
+            </div>
+          </div>
+          <div v-if="auth.canWrite" class="flex gap-2 shrink-0">
+            <button type="button" @click="linkAdvance(invoice.advance_link_suggestion.id)" :disabled="linkingAdvance"
+              class="cursor-pointer text-xs px-2 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+              {{ t('purchase_invoice.advance_link.confirm') }}
+            </button>
+            <button type="button" @click="dismissAdvanceSuggestion" :disabled="linkingAdvance"
+              class="cursor-pointer text-xs px-2 py-1 border border-neutral-300 rounded text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">
+              {{ t('purchase_invoice.advance_link.dismiss') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="flex items-center justify-between gap-3">
+          <p class="text-sm text-neutral-500">{{ t('purchase_invoice.advance_link.none') }}</p>
+          <button v-if="auth.canWrite" type="button" @click="openAdvanceModal"
+            class="cursor-pointer text-sm px-3 h-9 border border-primary-500/40 text-primary-700 hover:bg-primary-50 rounded-md shrink-0">
+            {{ t('purchase_invoice.advance_link.pair') }}
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <!-- Modal výběru zálohy k propojení -->
+    <div v-if="advanceModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="advanceModalOpen = false">
+      <div class="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="px-5 py-3 border-b border-neutral-100 flex items-center justify-between">
+          <h3 class="font-medium">{{ t('purchase_invoice.advance_link.modal_title') }}</h3>
+          <button type="button" @click="advanceModalOpen = false" class="cursor-pointer text-neutral-400 hover:text-neutral-600">✕</button>
+        </div>
+        <div class="p-4 overflow-y-auto">
+          <div v-if="loadingCandidates" class="text-sm text-neutral-500">{{ t('common.loading') }}</div>
+          <div v-else-if="advanceCandidates.length === 0" class="text-sm text-neutral-500">{{ t('purchase_invoice.advance_link.no_candidates') }}</div>
+          <ul v-else class="space-y-2">
+            <li v-for="cand in advanceCandidates" :key="cand.id">
+              <button type="button" @click="linkAdvance(cand.id)" :disabled="linkingAdvance"
+                class="cursor-pointer w-full text-left px-3 py-2 border border-neutral-200 rounded-md hover:border-primary-400 hover:bg-primary-50 disabled:opacity-50 flex justify-between items-center gap-3">
+                <span class="font-mono text-sm">{{ cand.varsymbol || cand.vendor_invoice_number || ('#' + cand.id) }}</span>
+                <span class="text-sm text-neutral-500">{{ cand.issue_date ? formatDate(cand.issue_date) : '' }} · {{ formatMoney(cand.total_with_vat, cand.currency) }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
 

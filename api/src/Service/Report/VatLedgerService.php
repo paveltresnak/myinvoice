@@ -16,7 +16,8 @@ use MyInvoice\Infrastructure\Database\Connection;
  *         drží daňový doklad (§ 73 ZDPH); zpětné DUZP tak padne do měsíce vystavení.
  *     (Zobrazený sloupec tax_date dál nese skutečné DUZP, mění se jen příslušnost k období.)
  *   - filtr stavu: bez 'cancelled'; 'draft' jen pokud $includeDrafts (Kniha ano,
- *     DPH/KH ne); u vystavených navíc bez 'proforma'
+ *     DPH/KH ne); u vystavených navíc bez 'proforma', u přijatých bez 'advance'
+ *     (zálohová/proforma není daňový doklad)
  *   - resolve klasifikačního kódu: řádek → hlavička → auto-default dle sazby + RC + směru
  *   - přepočet na CZK kurzem faktury
  *   - RC samovyměření (jen přijaté): když pii.total_vat=0 a (reverse_charge flag NEBO
@@ -174,6 +175,12 @@ final class VatLedgerService
          LEFT JOIN currencies cur ON cur.id = pi.currency_id
              WHERE pi.supplier_id = ?
                AND {$statusFilter}
+               -- Zálohová / proforma (advance) NENÍ daňový doklad → ven z DPH evidence,
+               -- symetricky k výstupní straně (fetchSales: invoice_type != 'proforma').
+               -- Daňovým dokladem je až 'daňový doklad k přijaté platbě', ne tato výzva k platbě.
+               -- COALESCE: NULL document_kind (legacy / neimportované doklady) = běžný
+               -- doklad → ponechat (NULL <> 'advance' by jinak řádek vyřadilo).
+               AND COALESCE(pi.document_kind, '') <> 'advance'
                AND pi.vat_deduction <> 'none'
                -- Období odpočtu = pozdější z (DUZP, vystavení). Nárok na odpočet nelze
                -- uplatnit dřív, než plátce drží daňový doklad (§ 73 odst. 2 ZDPH), takže

@@ -64,8 +64,13 @@ final class DphBookBuilder
         foreach ($this->groupLedgerRows($supplierId, $start, $end) as $g) {
             $scope = $g['source'] === 'sale' ? 'issued' : 'received';
             $line = $g['dphdp3_line'];
-            // Bez klasifikace / bez řádku → uncategorized (fallback dle sazby + směru).
             if ($line === null) {
+                // Kód s vědomě prázdným řádkem (např. 42 "bez nároku na odpočet") do
+                // Knihy DPH nepatří — přeskočíme. Fallback dle sazby použij jen pro
+                // doklady úplně bez klasifikace (chybějící, ne vyloučená).
+                if (($g['code'] ?? '') !== '') {
+                    continue;
+                }
                 $line = $g['vat_rate'] >= 20.5
                     ? ($g['source'] === 'sale' ? '1' : '40')
                     : ($g['vat_rate'] > 0 ? ($g['source'] === 'sale' ? '2' : '41') : null);

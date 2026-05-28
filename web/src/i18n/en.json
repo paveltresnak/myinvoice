@@ -168,6 +168,24 @@
       "needs_review_tooltip": "This invoice needs review after AI extraction",
       "dismiss": "Acknowledge"
     },
+    "advance_link": {
+      "title": "Advance invoice",
+      "none": "Not linked to an advance.",
+      "pair": "Link to advance",
+      "linked_to": "Settles advance",
+      "unlink": "Unlink",
+      "unlink_confirm": "Unlink from the advance invoice?",
+      "linked": "Advance linked.",
+      "unlinked": "Link removed.",
+      "settled_by": "Settled by invoice",
+      "not_settled": "This advance is not yet settled by any invoice.",
+      "modal_title": "Select an advance invoice to link",
+      "no_candidates": "No unlinked advances from this vendor.",
+      "ai_suggestion_title": "AI link suggestion",
+      "ai_suggestion_body": "This invoice likely settles advance",
+      "confirm": "Confirm",
+      "dismiss": "Dismiss"
+    },
     "scan_inbox": {
       "title": "Scan received invoices inbox",
       "trigger": "Run scan",

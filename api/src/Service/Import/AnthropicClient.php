@@ -201,7 +201,8 @@ JSON schema:
   "total_without_vat": number|null,
   "total_with_vat": number|null,
   "total_with_vat_rounded": number|null,
-  "already_paid": boolean
+  "already_paid": boolean,
+  "advance_reference": string|null
 }
 
 DŮLEŽITÉ k poli `document_kind`:
@@ -236,6 +237,14 @@ DŮLEŽITÉ k poli `already_paid`:
   "UHRAZENO", "PAID", "ALREADY PAID", "PAYMENT RECEIVED", "Hradí se ze zálohy"
   nebo podobné indikátory že faktura už byla zaplacena → vrať `true`.
 - Pokud žádný takový text není (default scénář) → vrať `false`.
+
+DŮLEŽITÉ k poli `advance_reference`:
+- Pokud doklad odkazuje na zaplacenou zálohu / proformu (typicky "Odečet zálohy",
+  "Zaplaceno zálohou č. ...", "Uhrazeno zálohovou fakturou ...", "k zálohové
+  faktuře č. ...", "Hradí se ze zálohy ...", "paid by advance ...", "proforma
+  no. ...") → vrať identifikátor té zálohy/proformy jak je uveden na dokladu
+  (číslo faktury / variabilní symbol), např. `"2026/0042"` nebo `"PF2026001"`.
+- Pokud žádný odkaz na zálohu není → vrať `null`. Nevymýšlej hodnoty.
 
 DŮLEŽITÉ k zaokrouhlení:
 - `total_with_vat` = přesný součet (např. 228.69)

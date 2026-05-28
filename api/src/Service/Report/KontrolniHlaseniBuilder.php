@@ -299,8 +299,15 @@ final class KontrolniHlaseniBuilder
             $base = (float) $r['base_czk'];
             $vat  = (float) $r['vat_czk'];
             $g['base_total'] += $base;
-            if ($r['vat_rate'] >= 20.5) { $g['base21'] += $base; $g['vat21'] += $vat; }
-            elseif ($r['vat_rate'] > 0) { $g['base12'] += $base; $g['vat12'] += $vat; }
+            // Přijaté plnění bez nároku na odpočet (dphdp3_line=NULL, např. kód 42
+            // "tuzemsko bez nároku") do B.2/B.3 nepatří — KH eviduje jen plnění,
+            // u kterých příjemce uplatňuje odpočet (a DPHDP3 je rovněž vynechává).
+            // Vystavené (sale) do A.4/A.5 přispívají vždy.
+            $khEligible = $r['source'] === 'sale' || $r['dphdp3_line'] !== null;
+            if ($khEligible) {
+                if ($r['vat_rate'] >= 20.5) { $g['base21'] += $base; $g['vat21'] += $vat; }
+                elseif ($r['vat_rate'] > 0) { $g['base12'] += $base; $g['vat12'] += $vat; }
+            }
             if ($r['kh_section'] === 'A.2') {
                 if ($r['vat_rate'] >= 20.5) { $g['a2_base21'] += $base; $g['a2_vat21'] += $vat; }
                 elseif ($r['vat_rate'] > 0) { $g['a2_base12'] += $base; $g['a2_vat12'] += $vat; }

@@ -374,7 +374,27 @@ final class AiPdfExtractor
         // Typicky odhalí faktury kde AI sečetla subtotaly jako další items
         // (např. NC Auto BMW Service → 4977 reálně vs 22442 jako duplicitní subtotaly).
         $this->maybeFlagTotalsMismatch($id, $supplierId, $data, $items);
+        // Finální faktura odkazující na zálohu ("zaplaceno zálohou č. X") → zkus najít
+        // shodnou přijatou zálohu a NAVRHNI propojení (uživatel potvrdí v detailu).
+        if ($documentKind !== 'advance') {
+            $this->maybeSuggestAdvanceLink($id, $supplierId, $vendorId, $data);
+        }
         return $id;
+    }
+
+    /**
+     * Pokud AI vrátila `advance_reference` (odkaz na zálohu/proformu), zkus najít
+     * shodnou nespárovanou zálohu téhož dodavatele a uložit NÁVRH propojení
+     * (advance_link_suggested_id). Vazbu NEAPLIKUJE — potvrzuje ji uživatel.
+     */
+    private function maybeSuggestAdvanceLink(int $invoiceId, int $supplierId, int $vendorId, array $data): void
+    {
+        $ref = trim((string) ($data['advance_reference'] ?? ''));
+        if ($ref === '') return;
+        $advanceId = $this->repo->findAdvanceByReference($supplierId, $vendorId, $ref);
+        if ($advanceId !== null && $advanceId !== $invoiceId) {
+            $this->repo->suggestAdvanceLink($invoiceId, $advanceId, $supplierId);
+        }
     }
 
     /**

@@ -61,10 +61,14 @@ use MyInvoice\Action\Invoice\MarkPaidAction;
 use MyInvoice\Action\Invoice\UnmarkPaidAction;
 use MyInvoice\Action\Invoice\BulkReissueAction;
 use MyInvoice\Action\Invoice\CloneInvoiceAction;
+use MyInvoice\Action\PurchaseInvoice\AdvanceCandidatesAction;
 use MyInvoice\Action\PurchaseInvoice\CreatePurchaseInvoiceAction;
 use MyInvoice\Action\PurchaseInvoice\DeletePurchaseInvoiceAction;
 use MyInvoice\Action\PurchaseInvoice\DeletePurchaseInvoicePdfAction;
+use MyInvoice\Action\PurchaseInvoice\DismissAdvanceSuggestionAction;
 use MyInvoice\Action\PurchaseInvoice\DismissExtractionWarningAction;
+use MyInvoice\Action\PurchaseInvoice\LinkAdvancePurchaseInvoiceAction;
+use MyInvoice\Action\PurchaseInvoice\UnlinkAdvancePurchaseInvoiceAction;
 use MyInvoice\Action\PurchaseInvoice\DownloadPurchaseInvoicePdfAction;
 use MyInvoice\Action\PurchaseInvoice\OurPdfPurchaseInvoiceAction;
 use MyInvoice\Action\PurchaseInvoice\ExportPurchaseInvoiceAction;
@@ -249,6 +253,11 @@ final class Routes
         $app->post   ('/api/purchase-invoices/{id:[0-9]+}/exchange-rate', SetPurchaseInvoiceExchangeRateAction::class);
         $app->post   ('/api/purchase-invoices/{id:[0-9]+}/transition',     TransitionPurchaseInvoiceStatusAction::class);
         $app->post   ('/api/purchase-invoices/{id:[0-9]+}/dismiss-extraction-warning', DismissExtractionWarningAction::class);
+        // Propojení se zálohovou fakturou (advance) — proti dvojímu započtení nákladu
+        $app->get    ('/api/purchase-invoices/{id:[0-9]+}/advance-candidates', AdvanceCandidatesAction::class);
+        $app->post   ('/api/purchase-invoices/{id:[0-9]+}/link-advance',     LinkAdvancePurchaseInvoiceAction::class);
+        $app->delete ('/api/purchase-invoices/{id:[0-9]+}/link-advance',     UnlinkAdvancePurchaseInvoiceAction::class);
+        $app->delete ('/api/purchase-invoices/{id:[0-9]+}/advance-suggestion', DismissAdvanceSuggestionAction::class);
         $app->post   ('/api/purchase-invoices/{id:[0-9]+}/pdf',            UploadPurchaseInvoicePdfAction::class);
         $app->get    ('/api/purchase-invoices/{id:[0-9]+}/pdf',            DownloadPurchaseInvoicePdfAction::class);
         $app->delete ('/api/purchase-invoices/{id:[0-9]+}/pdf',            DeletePurchaseInvoicePdfAction::class);

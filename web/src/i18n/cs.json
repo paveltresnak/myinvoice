@@ -168,6 +168,24 @@
       "needs_review_tooltip": "Tato faktura vyžaduje kontrolu po AI extrakci",
       "dismiss": "Beru na vědomí"
     },
+    "advance_link": {
+      "title": "Zálohová faktura",
+      "none": "Není propojeno se zálohou.",
+      "pair": "Spárovat se zálohou",
+      "linked_to": "Vyúčtovává zálohu",
+      "unlink": "Zrušit propojení",
+      "unlink_confirm": "Zrušit propojení se zálohovou fakturou?",
+      "linked": "Záloha propojena.",
+      "unlinked": "Propojení zrušeno.",
+      "settled_by": "Vyúčtováno fakturou",
+      "not_settled": "Tato záloha zatím není vyúčtována žádnou fakturou.",
+      "modal_title": "Vyber zálohovou fakturu k propojení",
+      "no_candidates": "Žádné nespárované zálohy od tohoto dodavatele.",
+      "ai_suggestion_title": "AI návrh propojení",
+      "ai_suggestion_body": "Tato faktura zřejmě vyúčtovává zálohu",
+      "confirm": "Potvrdit",
+      "dismiss": "Zamítnout"
+    },
     "scan_inbox": {
       "title": "Scan inbox přijatých faktur",
       "trigger": "Spustit scan",

@@ -161,6 +161,10 @@ final class IncomeTaxBuilder
               WHERE pi.supplier_id = ?
                 AND pi.status NOT IN ('draft', 'cancelled')
                 AND pi.tax_deductible = 1
+                -- Zálohová / proforma (advance) NENÍ daňový doklad → nikdy uznatelný
+                -- náklad (bez ohledu na zaplacení/párování). Symetrické k příjmové
+                -- straně, která vylučuje invoice_type='proforma'.
+                AND COALESCE(pi.document_kind, '') <> 'advance'
                 AND COALESCE(c.code, 'CZK') = 'CZK'
                 -- NULL-safe: GREATEST(NULL, x) = NULL → faktury bez DUZP by jinak vypadly.
                 AND GREATEST(COALESCE(pi.tax_date, pi.issue_date), pi.issue_date) BETWEEN ? AND ?"
