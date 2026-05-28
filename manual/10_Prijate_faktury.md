@@ -123,6 +123,41 @@ Po uložení / přechodu na detail:
 - Tlačítko **Upravit** je dostupné jen u draft. Po označení jako přijatá je doklad immutable (kromě admin override `?force=1` u received).
 - Tlačítko **Smazat** je dostupné jen u draft. Pro pozdější stavy použij Stornovat.
 
+### 10.3.1 Propojení zálohy s vyúčtovací fakturou (proti dvojímu započtení)
+
+> Přidáno v4.3.11.
+
+Když ti dodavatel pošle nejdřív **zálohovou fakturu** (typ dokladu *Záloha* / proforma)
+a po zaplacení samostatnou **vyúčtovací (finální) fakturu**, máš v systému dva doklady
+na tentýž náklad. Bez propojení by se náklad počítal **dvakrát** (Náklady, CRM, daň
+z příjmů). Proto je lze spárovat.
+
+**Jak na to** — v detailu **finální** faktury je box **Zálohová faktura**:
+
+- Pokud vazba není, klikni **Spárovat se zálohou** a vyber zálohu od stejného
+  dodavatele. Nabídka řadí napřed zálohy ve **stejné měně** a s **nejbližší částkou**
+  (porovnává hrubou částku faktury *před* odečtem zálohy, takže i faktura uhrazená
+  zálohou „na 0 Kč" se napáruje správně).
+- Po spárování se zobrazí odkaz na zálohu a tlačítko **Zrušit propojení**. Na finální
+  fakturu se zároveň doplní odečet zálohy (`advance_paid_amount`), pokud byl nulový.
+- V detailu **zálohy** vidíš reverzně, kterou fakturou je vyúčtována.
+
+Jedna záloha může být navázaná **jen na jednu** finální fakturu.
+
+**Co propojení (a zaplacení) ovlivní:**
+
+| Oblast | Chování zálohy |
+|---|---|
+| **Náklady, CRM statistiky** | Spárovaná **nebo zaplacená** záloha se nepočítá (náklad nese vyúčtovací faktura). Nezaplacená a nespárovaná záloha se počítá jako očekávaný náklad. |
+| **Daň z příjmů (DPFO/DPPO)** | Záloha **nikdy** není uznatelný náklad (není daňový doklad) — bez ohledu na zaplacení/párování. |
+| **Výkazy DPH** (Kniha DPH, DPHDP3, KH, souhrnné hlášení) | Záloha do nich **nevstupuje vůbec** (není daňový doklad; tím je až vyúčtovací faktura). |
+| **Závazky / cashflow** | Nezaplacená záloha zůstává jako reálný závazek k úhradě. |
+
+**AI návrh propojení** — když naimportuješ vyúčtovací fakturu přes AI extrakci z PDF
+(viz 10.7) a ta odkazuje na zálohu (text typu *„zaplaceno zálohou č. X"*), systém
+zkusí najít odpovídající zálohu a v detailu nabídne **návrh propojení**. Stačí ho
+**Potvrdit** (nebo **Zamítnout**) — nic se nepáruje automaticky.
+
 ## 10.4 Scan inbox — automatický import z adresáře
 
 Pokud máš dodavatele kteří ti **posílají PDF e-mailem** nebo máš složku
@@ -265,6 +300,8 @@ Akce s přijatými fakturami jsou logované v aktivním logu (Systém → Log):
 - `purchase_invoice.exchange_rate_set`
 - `purchase_invoice.transitioned` (s payloadem `{from, to}`)
 - `purchase_invoice.extraction_warning_dismissed`
+- `purchase_invoice.advance_linked` / `advance_unlinked` (propojení se zálohou)
+- `purchase_invoice.advance_suggestion_dismissed` (zamítnutý AI návrh propojení)
 - `purchase_invoice.deleted`
 - `purchase_invoice.pdf_uploaded` / `pdf_downloaded`
 - `purchase_invoice.our_pdf_downloaded`
