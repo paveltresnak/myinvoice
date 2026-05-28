@@ -199,7 +199,11 @@ async function loadVarsymbolPreview() {
     return
   }
   try {
-    const r = await invoicesApi.previewVarsymbol(form.value.invoice_type, form.value.issue_date)
+    const r = await invoicesApi.previewVarsymbol(
+      form.value.invoice_type,
+      form.value.issue_date,
+      form.value.client_id ?? undefined,
+    )
     varsymbolAutoPreview.value = r.varsymbol
     varsymbolAutoHasTemplate.value = r.has_template
   } catch {
@@ -207,7 +211,7 @@ async function loadVarsymbolPreview() {
     varsymbolAutoHasTemplate.value = false
   }
 }
-watch(() => [form.value.invoice_type, form.value.issue_date], () => {
+watch(() => [form.value.invoice_type, form.value.issue_date, form.value.client_id], () => {
   if (loaded.value && editedStatus.value === 'draft') loadVarsymbolPreview()
 })
 

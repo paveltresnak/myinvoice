@@ -285,9 +285,10 @@ export const invoicesApi = {
    * Vrátí náhled, jaké číslo faktura dostane při Vystavení (BEZ inkrementu counteru).
    * Používá se v editoru jako placeholder „automaticky: JD2026-01".
    */
-  previewVarsymbol: (type: 'invoice' | 'proforma' | 'credit_note', issueDate: string) =>
+  previewVarsymbol: (type: 'invoice' | 'proforma' | 'credit_note', issueDate: string, clientId?: number) =>
     api.get<{ varsymbol: string; has_template: boolean }>(
-      `/invoices/preview-varsymbol`, { params: { type, issue_date: issueDate } },
+      `/invoices/preview-varsymbol`,
+      { params: { type, issue_date: issueDate, ...(clientId ? { client_id: clientId } : {}) } },
     ).then(r => r.data),
   create: (payload: InvoicePayload) => api.post<Invoice>('/invoices', payload).then(r => r.data),
   update: (id: number, payload: InvoicePayload, force = false) =>

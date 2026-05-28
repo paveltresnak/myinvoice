@@ -48,6 +48,10 @@ const form = ref<ClientPayload>({
   payment_due_default: 7,
   hourly_rate: 0,
   note: null,
+  invoice_number_format: null,
+  proforma_number_format: null,
+  credit_note_number_format: null,
+  invoice_number_period: null,
 })
 
 // Pro lock UI — counts of issued/received invoices se hodí znát, aby user věděl
@@ -106,6 +110,10 @@ function sanitize(c: Client): Partial<ClientPayload> {
     payment_due_default: c.payment_due_default ?? null,
     hourly_rate: c.hourly_rate ?? 0,
     note: c.note ?? null,
+    invoice_number_format: c.invoice_number_format ?? null,
+    proforma_number_format: c.proforma_number_format ?? null,
+    credit_note_number_format: c.credit_note_number_format ?? null,
+    invoice_number_period: c.invoice_number_period ?? null,
   }
 }
 
@@ -399,6 +407,42 @@ async function submit() {
           <textarea autocomplete="off" v-model="form.note" rows="2"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"></textarea>
         </div>
+
+        <!-- Per-client číselná řada (volitelná) -->
+        <details class="pt-3 border-t border-neutral-100" :open="!!(form.invoice_number_format || form.proforma_number_format || form.credit_note_number_format)">
+          <summary class="cursor-pointer text-sm font-medium text-neutral-700">
+            {{ t('client.numbering_section') }}
+          </summary>
+          <p class="text-xs text-neutral-500 mt-1 mb-3">{{ t('client.numbering_hint') }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('client.invoice_number_format') }}</label>
+              <input v-model="form.invoice_number_format" type="text" maxlength="60" placeholder="{YY}{CCCC}"
+                class="w-full h-10 px-3 border border-neutral-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('client.proforma_number_format') }}</label>
+              <input v-model="form.proforma_number_format" type="text" maxlength="60" placeholder="9{YY}{CCCC}"
+                class="w-full h-10 px-3 border border-neutral-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('client.credit_note_number_format') }}</label>
+              <input v-model="form.credit_note_number_format" type="text" maxlength="60" placeholder=""
+                class="w-full h-10 px-3 border border-neutral-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-neutral-700 mb-1">{{ t('client.invoice_number_period') }}</label>
+              <select v-model="form.invoice_number_period"
+                class="w-full h-10 px-3 border border-neutral-300 rounded-md bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none">
+                <option :value="null">{{ t('client.numbering_period_inherit') }}</option>
+                <option value="year">{{ t('client.numbering_period_year') }}</option>
+                <option value="month">{{ t('client.numbering_period_month') }}</option>
+                <option value="none">{{ t('client.numbering_period_none') }}</option>
+              </select>
+            </div>
+          </div>
+          <p class="text-xs text-neutral-500 mt-2">{{ t('client.numbering_placeholders_hint') }}</p>
+        </details>
 
         <div v-if="error" class="rounded-md bg-danger-50 border border-danger-500/40 px-3 py-2 text-sm text-danger-500">
           {{ error }}

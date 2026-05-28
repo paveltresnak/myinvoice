@@ -105,7 +105,7 @@ final class IssueInvoiceAction
             $varsymbol = $manualVarsymbol;
         } else {
             try {
-                $varsymbol = $this->varsymbol->next($supplierId, $invoice['invoice_type'], $issueDate);
+                $varsymbol = $this->varsymbol->next($supplierId, $invoice['invoice_type'], $issueDate, (int) $invoice['client_id']);
             } catch (\InvalidArgumentException $e) {
                 return Json::error($response, 'varsymbol_failed', $e->getMessage(), 500);
             }

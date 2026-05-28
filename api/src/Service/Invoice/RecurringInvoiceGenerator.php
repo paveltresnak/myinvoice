@@ -432,7 +432,7 @@ final class RecurringInvoiceGenerator
 
         $supplierId = (int) $invoice['supplier_id'];
         $issueDate = new \DateTimeImmutable((string) $invoice['issue_date']);
-        $varsymbol = $this->varsymbol->next($supplierId, (string) $invoice['invoice_type'], $issueDate);
+        $varsymbol = $this->varsymbol->next($supplierId, (string) $invoice['invoice_type'], $issueDate, (int) $invoice['client_id']);
         $snaps = $this->snapshots->build(
             (int) $invoice['client_id'],
             (int) $invoice['currency_id'],

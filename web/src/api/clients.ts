@@ -23,6 +23,10 @@ export interface Client {
   payment_due_default?: number | null
   hourly_rate: number
   note?: string | null
+  invoice_number_format?: string | null
+  proforma_number_format?: string | null
+  credit_note_number_format?: string | null
+  invoice_number_period?: 'year' | 'month' | 'none' | null
   archived_at?: string | null
   active_projects_count?: number
   invoices_count?: number
@@ -110,6 +114,10 @@ export interface ClientPayload {
   payment_due_default?: number | null
   hourly_rate?: number
   note?: string | null
+  invoice_number_format?: string | null
+  proforma_number_format?: string | null
+  credit_note_number_format?: string | null
+  invoice_number_period?: 'year' | 'month' | 'none' | null
 }
 
 export interface ListResponse<T> {

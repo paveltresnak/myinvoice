@@ -120,7 +120,7 @@ final class DeleteInvoiceAction
             $parentVs   = (string) ($existing['varsymbol'] ?? '');
             if ($parentVs !== '' && in_array($parentType, ['invoice', 'proforma', 'credit_note'], true)) {
                 $issueDate = !empty($existing['issue_date']) ? new \DateTimeImmutable($existing['issue_date']) : null;
-                if ($this->varsymbol->releaseIfLatest($supplierId, $parentType, $parentVs, $issueDate)) {
+                if ($this->varsymbol->releaseIfLatest($supplierId, $parentType, $parentVs, $issueDate, $clientId ?? 0)) {
                     $counterReleased[] = ['id' => $id, 'varsymbol' => $parentVs, 'type' => $parentType];
                 }
             }
@@ -130,7 +130,7 @@ final class DeleteInvoiceAction
             $cvs   = (string) ($child['varsymbol'] ?? '');
             if ($cvs === '' || !in_array($ctype, ['invoice', 'proforma', 'credit_note'], true)) continue;
             $cdate = !empty($child['issue_date']) ? new \DateTimeImmutable($child['issue_date']) : null;
-            if ($this->varsymbol->releaseIfLatest($supplierId, $ctype, $cvs, $cdate)) {
+            if ($this->varsymbol->releaseIfLatest($supplierId, $ctype, $cvs, $cdate, $clientId ?? 0)) {
                 $counterReleased[] = ['id' => (int) $child['id'], 'varsymbol' => $cvs, 'type' => $ctype];
             }
         }
