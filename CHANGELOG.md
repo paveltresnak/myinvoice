@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.10] — 2026-05-28
+
+Zadávání částek s DPH na řádku faktury a oprava pádu Přehledu při neúplné odpovědi.
+
+### Added
+
+- **Zadání částky s DPH na řádku** (vydaná i přijatá faktura) — řádkové „Celkem s DPH" je nově editovatelné pole. Po zadání částky včetně DPH se zpětně dopočítá jednotková cena bez DPH (`částka / (1 + sazba) / množství`). Funguje i s výrazy (`1000*1.21`, desetinná čárka). U neplátce / reverse-charge je sazba 0.
+
+### Fixed
+
+- **Přehled (Dashboard) padal při neúplné odpovědi summary** (`TypeError … issued_count_ytd`) — přístup k `summary.kpi` je nově null-safe a stránka při chybové/neúplné odpovědi ukáže uvítací stav místo bílé obrazovky. Backendový souhrn navíc nespadne, pokud ještě neproběhla migrace `0062` (sloupec `flat_tax_band`).
+
 ## [4.3.9] — 2026-05-28
 
 Sjednocení hlavičky PDF výkazu víceprací s fakturou.
