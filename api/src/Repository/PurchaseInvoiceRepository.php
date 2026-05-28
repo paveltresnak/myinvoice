@@ -38,11 +38,13 @@ final class PurchaseInvoiceRepository
                     c.company_name AS vendor_company_name, c.ic AS vendor_ic, c.dic AS vendor_dic,
                     c.main_email AS vendor_main_email, c.language AS vendor_language,
                     cur.code AS currency, cur.symbol AS currency_symbol, cur.decimals AS currency_decimals,
-                    pcur.code AS payment_currency, pcur.symbol AS payment_currency_symbol
+                    pcur.code AS payment_currency, pcur.symbol AS payment_currency_symbol,
+                    ec.label AS expense_category_label, ec.code AS expense_category_code
                FROM purchase_invoices pi
                JOIN clients c        ON c.id   = pi.vendor_id
                JOIN currencies cur   ON cur.id = pi.currency_id
           LEFT JOIN currencies pcur  ON pcur.id = pi.payment_currency_id
+          LEFT JOIN expense_categories ec ON ec.id = pi.expense_category_id
               WHERE pi.id = ? AND pi.supplier_id = ?'
         );
         $stmt->execute([$id, $supplierId]);

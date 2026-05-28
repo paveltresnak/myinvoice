@@ -414,6 +414,16 @@ function transitionLabel(target: PurchaseInvoiceStatus): string {
               {{ invoice.tax_deductible === false ? t('common.no') : t('common.yes') }}
             </dd>
           </div>
+          <div class="flex justify-between">
+            <dt class="text-neutral-500">{{ t('purchase_invoice.classification.expense_category') }}</dt>
+            <dd class="font-medium text-right text-neutral-700">
+              <template v-if="invoice.expense_category_label">
+                {{ invoice.expense_category_label }}
+                <span class="text-neutral-400">({{ invoice.expense_category_code }})</span>
+              </template>
+              <span v-else class="text-neutral-400">—</span>
+            </dd>
+          </div>
         </dl>
       </div>
 

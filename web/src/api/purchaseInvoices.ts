@@ -127,6 +127,9 @@ export interface PurchaseInvoice {
   pdf_uploaded_at: string | null
   vat_classification_code: string | null
   expense_category_id: number | null
+  /** Název + kód kategorie nákladu (join z expense_categories, jen v detailu). */
+  expense_category_label?: string | null
+  expense_category_code?: string | null
   /** Záloha (advance), kterou tato finální faktura vyúčtovává (vazba uložená na finální). */
   advance_purchase_invoice_id: number | null
   /** AI návrh propojení se zálohou (čeká na potvrzení uživatelem). */
