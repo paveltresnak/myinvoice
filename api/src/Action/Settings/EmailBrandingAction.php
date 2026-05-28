@@ -69,7 +69,7 @@ final class EmailBrandingAction
         // Move do dočasné cesty pro zpracování
         $tmpDir = sys_get_temp_dir();
         if (!is_writable($tmpDir)) {
-            $tmpDir = Bootstrap::rootDir() . '/storage/supplier-logos';
+            $tmpDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos');
             if (!is_dir($tmpDir)) @mkdir($tmpDir, 0755, true);
         }
         $tmpPath = $tmpDir . '/.upload-' . bin2hex(random_bytes(8));

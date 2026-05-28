@@ -364,7 +364,7 @@ final class PurchaseInvoiceInboxScanner
         if ($archiveRoot === '') {
             $uploads = (string) $this->config->get('storage.uploads_dir', '');
             $archiveRoot = $uploads !== '' ? dirname($uploads) . '/purchase-invoices'
-                : __DIR__ . '/../../../../storage/purchase-invoices';
+                : \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
         }
         $tenantDir = $archiveRoot . DIRECTORY_SEPARATOR . 'supplier-' . $supplierId;
         if (!is_dir($tenantDir)) @mkdir($tenantDir, 0755, true);

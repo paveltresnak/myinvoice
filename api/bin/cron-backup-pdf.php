@@ -46,12 +46,12 @@ $date = date('Y-m-d_H-i');
 $file = "$backupDir/$dbName-pdf-$date.zip";
 
 $sources = [
-    $rootDir . '/storage/invoices',
-    $rootDir . '/storage/work-reports',
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices'),
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('work-reports'),
     // Přijaté faktury — archive PDF od dodavatelů (fáze 1 integrace forku).
     // Default storage/purchase-invoices; pokud user nastaví custom archive_storage
     // v cfg.php, použijeme tu cestu.
-    (string) ($config->get('purchase_invoice.archive_storage', '') ?: $rootDir . '/storage/purchase-invoices'),
+    (string) ($config->get('purchase_invoice.archive_storage', '') ?: \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices')),
 ];
 
 // Sesbírej všechny .pdf rekurzivně

@@ -33,7 +33,7 @@ final class DphBookPdfRenderer
         $body = $this->twig()->render('dph_book.twig', $data);
 
         $rootDir = Bootstrap::rootDir();
-        $tmpDir = $rootDir . '/storage/cache/mpdf';
+        $tmpDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('cache/mpdf');
         if (!is_dir($tmpDir)) {
             @mkdir($tmpDir, 0755, true);
         }

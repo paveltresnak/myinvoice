@@ -77,7 +77,7 @@ final class PdfArchiveService
 
         // Cíl: storage/invoices/sup-{supplierId}/_archive/{YmdHis}-{sha8}-{originalname}
         $supplierId = $this->resolveSupplierId($invoiceId);
-        $archiveDir = Bootstrap::rootDir() . '/storage/invoices/sup-' . $supplierId . '/_archive';
+        $archiveDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices') . '/sup-' . $supplierId . '/_archive';
         if (!is_dir($archiveDir)) {
             @mkdir($archiveDir, 0755, true);
         }
@@ -186,7 +186,7 @@ final class PdfArchiveService
         if (!$filename) return null;
 
         $supplierId = $this->resolveSupplierId($invoiceId);
-        $path = Bootstrap::rootDir() . '/storage/invoices/sup-' . $supplierId
+        $path = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices') . '/sup-' . $supplierId
               . '/_archive/' . (string) $filename;
         return is_file($path) ? $path : null;
     }
@@ -209,7 +209,7 @@ final class PdfArchiveService
         if (empty($filenames)) return 0;
 
         $supplierId = $this->resolveSupplierId($invoiceId);
-        $dir = Bootstrap::rootDir() . '/storage/invoices/sup-' . $supplierId . '/_archive';
+        $dir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices') . '/sup-' . $supplierId . '/_archive';
         $deleted = 0;
         foreach ($filenames as $name) {
             $path = $dir . '/' . (string) $name;

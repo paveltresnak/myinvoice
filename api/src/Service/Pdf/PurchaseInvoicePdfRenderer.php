@@ -92,7 +92,7 @@ final class PurchaseInvoicePdfRenderer
             'margin_top' => 15,
             'margin_bottom' => 18,
             'default_font' => 'dejavusans',
-            'tempDir' => Bootstrap::rootDir() . '/storage/mpdf-temp',
+            'tempDir' => \MyInvoice\Infrastructure\Config\RuntimePaths::storage('mpdf-temp'),
         ]);
         $mpdf->SetTitle(($docTypeLabel ?: 'Faktura') . ' ' . ($invoice['vendor_invoice_number'] ?? '#' . $invoice['id']));
         $mpdf->SetCreator('MyInvoice.cz');

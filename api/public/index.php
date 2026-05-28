@@ -27,7 +27,7 @@ try {
     }
 
     // Detail loguj, pokud je dostupný adresář.
-    $logDir = __DIR__ . '/../../log';
+    $logDir = \MyInvoice\Infrastructure\Config\RuntimePaths::log();
     if (is_dir($logDir) && is_writable($logDir)) {
         @file_put_contents(
             $logDir . '/bootstrap-error.log',

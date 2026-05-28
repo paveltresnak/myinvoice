@@ -185,10 +185,10 @@ $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
 // PDF cache + storage cleanup — vč. přijaté faktury archive + XSD (necháváme)
 $dirs = [
-    $rootDir . '/storage/invoices',
-    $rootDir . '/storage/purchase-invoices',  // archive PDF dodavatelů (fáze 1)
-    $rootDir . '/storage/cache/mpdf',
-    $rootDir . '/storage/cache/twig',
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices'),
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices'),  // archive PDF dodavatelů (fáze 1)
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('cache/mpdf'),
+    \MyInvoice\Infrastructure\Config\RuntimePaths::storage('cache/twig'),
 ];
 echo "\n[reset] Čistím cache adresáře…\n";
 foreach ($dirs as $d) {

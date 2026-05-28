@@ -783,7 +783,7 @@ final class AiPdfExtractor
         try {
             $archiveRoot = (string) $this->config->get('purchase_invoice.archive_storage', '');
             if ($archiveRoot === '') {
-                $archiveRoot = Bootstrap::rootDir() . '/storage/purchase-invoices';
+                $archiveRoot = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
             }
             $tenantDir = $archiveRoot . '/supplier-' . $supplierId;
             if (!is_dir($tenantDir)) {

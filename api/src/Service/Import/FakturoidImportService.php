@@ -450,7 +450,7 @@ final class FakturoidImportService
         if ($archiveRoot === '') {
             $uploads = (string) $this->config->get('storage.uploads_dir', '');
             $archiveRoot = $uploads !== '' ? dirname($uploads) . '/invoices-imported'
-                : __DIR__ . '/../../../../storage/invoices-imported';
+                : \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices-imported');
         }
         $tenantDir = $archiveRoot . DIRECTORY_SEPARATOR . 'supplier-' . $supplierId;
         if (!is_dir($tenantDir)) @mkdir($tenantDir, 0755, true);
@@ -485,7 +485,7 @@ final class FakturoidImportService
         if ($archiveRoot === '') {
             $uploads = (string) $this->config->get('storage.uploads_dir', '');
             $archiveRoot = $uploads !== '' ? dirname($uploads) . '/purchase-invoices'
-                : __DIR__ . '/../../../../storage/purchase-invoices';
+                : \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
         }
         $tenantDir = $archiveRoot . DIRECTORY_SEPARATOR . 'supplier-' . $supplierId;
         if (!is_dir($tenantDir)) @mkdir($tenantDir, 0755, true);

@@ -84,7 +84,7 @@ final class UploadPurchaseInvoicePdfAction
             $storageBase = (string) $this->config->get('storage.uploads_dir', '');
             $archiveDir = $storageBase !== ''
                 ? dirname($storageBase) . '/purchase-invoices'
-                : __DIR__ . '/../../../../storage/purchase-invoices';
+                : \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
         }
         $tenantDir = $archiveDir . DIRECTORY_SEPARATOR . 'supplier-' . $supplierId;
         if (!is_dir($tenantDir) && !@mkdir($tenantDir, 0755, true) && !is_dir($tenantDir)) {

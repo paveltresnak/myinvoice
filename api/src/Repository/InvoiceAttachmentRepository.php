@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MyInvoice\Repository;
 
-use MyInvoice\Bootstrap;
+use MyInvoice\Infrastructure\Config\RuntimePaths;
 use MyInvoice\Infrastructure\Database\Connection;
 use PDO;
 
@@ -99,8 +99,8 @@ final class InvoiceAttachmentRepository
 
     public static function dirFor(int $supplierId, int $invoiceId): string
     {
-        return Bootstrap::rootDir()
-            . '/storage/invoices/sup-' . $supplierId
+        return RuntimePaths::storage('invoices')
+            . '/sup-' . $supplierId
             . '/attachments/' . $invoiceId;
     }
 

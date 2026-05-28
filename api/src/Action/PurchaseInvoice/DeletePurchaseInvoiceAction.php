@@ -98,7 +98,7 @@ final class DeletePurchaseInvoiceAction
             $storageBase = (string) $this->config->get('storage.uploads_dir', '');
             $archiveRoot = $storageBase !== ''
                 ? dirname($storageBase) . '/purchase-invoices'
-                : __DIR__ . '/../../../../storage/purchase-invoices';
+                : \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
         }
         $fullPath = $archiveRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
         $archiveRootReal = realpath($archiveRoot);

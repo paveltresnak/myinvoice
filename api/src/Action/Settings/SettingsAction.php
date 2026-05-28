@@ -365,7 +365,7 @@ final class SettingsAction
         }
 
         // MS-P3-4: smaž PDF cache subfolder pro tohoto supplier
-        $pdfDir = \MyInvoice\Bootstrap::rootDir() . '/storage/invoices/sup-' . $id;
+        $pdfDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices') . '/sup-' . $id;
         if (is_dir($pdfDir)) {
             $iter = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($pdfDir, \FilesystemIterator::SKIP_DOTS),
@@ -408,7 +408,7 @@ final class SettingsAction
         $row['email_branding_enabled']   = (bool) ($row['email_branding_enabled'] ?? false);
         $row['email_accent_color']       = (string) ($row['email_accent_color'] ?? '#3B2D83');
         $row['pdf_logo_show_name']       = (bool) ($row['pdf_logo_show_name'] ?? false);
-        $row['has_email_logo']           = is_file(\MyInvoice\Bootstrap::rootDir() . '/storage/supplier-logos/sup-' . $row['id'] . '.png');
+        $row['has_email_logo']           = is_file(\MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos') . '/sup-' . $row['id'] . '.png');
         // Globální cfg fallback pro varsymbol — UI ho použije jako placeholder
         // u prázdných per-supplier polí (aby uživatel viděl, jaká šablona by se
         // použila kdyby ponechal pole prázdné).

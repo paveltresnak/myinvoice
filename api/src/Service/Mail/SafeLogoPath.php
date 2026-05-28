@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MyInvoice\Service\Mail;
 
-use MyInvoice\Bootstrap;
+use MyInvoice\Infrastructure\Config\RuntimePaths;
 
 /**
  * Validuje + resolvuje `supplier.logo_path` na bezpečnou absolutní cestu.
@@ -24,7 +24,7 @@ use MyInvoice\Bootstrap;
  *   - prefix odpovídá očekávanému dir
  *   - basename match `sup-{supplierId}.{ext}` (žádný traversal)
  *   - extension je v allowlistu
- *   - realpath() neutekl mimo Bootstrap::rootDir() . '/storage/supplier-logos/'
+ *   - realpath() neutekl mimo RuntimePaths::storage('supplier-logos')
  *   - soubor reálně existuje
  *
  * Vrací null v ostatních případech (caller má fallback chování).
@@ -55,7 +55,7 @@ final class SafeLogoPath
         $basename = basename($rel);
         if ($basename !== 'sup-' . $supplierId . '.' . $ext) return null;
 
-        $rootDir = Bootstrap::rootDir();
+        $rootDir = \MyInvoice\Infrastructure\Config\RuntimePaths::base();
         $abs = $rootDir . '/' . $rel;
 
         // realpath rejection (sym-link follow, real check that file is inside SAFE_DIR)

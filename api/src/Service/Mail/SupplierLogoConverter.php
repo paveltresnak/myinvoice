@@ -61,7 +61,7 @@ final class SupplierLogoConverter
 
         $mime = $this->detectMime($sourcePath);
 
-        $targetDir  = Bootstrap::rootDir() . '/storage/supplier-logos';
+        $targetDir  = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos');
         $targetPath = $targetDir . '/sup-' . $supplierId . '.png';
         if (!is_dir($targetDir)) {
             @mkdir($targetDir, 0755, true);
@@ -109,7 +109,7 @@ final class SupplierLogoConverter
      */
     public function delete(int $supplierId): void
     {
-        $base = Bootstrap::rootDir() . '/storage/supplier-logos/sup-' . $supplierId;
+        $base = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos') . '/sup-' . $supplierId;
         foreach (['.png', '.svg'] as $ext) {
             if (is_file($base . $ext)) @unlink($base . $ext);
         }
@@ -118,7 +118,7 @@ final class SupplierLogoConverter
     /** Vrátí absolutní cestu k PNG logu pokud existuje, jinak null. (Email — vždy PNG.) */
     public function absPathFor(int $supplierId): ?string
     {
-        $path = Bootstrap::rootDir() . '/storage/supplier-logos/sup-' . $supplierId . '.png';
+        $path = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos') . '/sup-' . $supplierId . '.png';
         return is_file($path) ? $path : null;
     }
 
@@ -128,7 +128,7 @@ final class SupplierLogoConverter
      */
     public function pdfPathFor(int $supplierId): ?string
     {
-        $base = Bootstrap::rootDir() . '/storage/supplier-logos/sup-' . $supplierId;
+        $base = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos') . '/sup-' . $supplierId;
         if (is_file($base . '.svg')) return $base . '.svg';
         if (is_file($base . '.png')) return $base . '.png';
         return null;

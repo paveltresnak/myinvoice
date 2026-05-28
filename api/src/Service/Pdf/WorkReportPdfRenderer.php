@@ -67,7 +67,7 @@ final class WorkReportPdfRenderer
         ]);
 
         $rootDir = Bootstrap::rootDir();
-        $tmpDir = $rootDir . '/storage/cache/mpdf';
+        $tmpDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('cache/mpdf');
         if (!is_dir($tmpDir)) {
             @mkdir($tmpDir, 0755, true);
         }
@@ -94,7 +94,7 @@ final class WorkReportPdfRenderer
 
         $supplierId = (int) ($invoice['supplier_id'] ?? 1);
         $issueDate = new \DateTimeImmutable($invoice['issue_date']);
-        $dir = $rootDir . '/storage/work-reports/sup-' . $supplierId . '/' . $issueDate->format('Y-m');
+        $dir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('work-reports') . '/sup-' . $supplierId . '/' . $issueDate->format('Y-m');
         if (!is_dir($dir)) @mkdir($dir, 0755, true);
 
         $vs = $invoice['varsymbol'] ?: ('draft-' . $invoice['id']);

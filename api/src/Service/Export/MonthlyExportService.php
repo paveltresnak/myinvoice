@@ -439,7 +439,7 @@ final class MonthlyExportService
         if ($dir !== '') return $dir;
         $uploads = (string) $this->config->get('storage.uploads_dir', '');
         if ($uploads !== '') return dirname($uploads) . '/purchase-invoices';
-        return __DIR__ . '/../../../../storage/purchase-invoices';
+        return \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
     }
 
     private function sanitize(string $s): string

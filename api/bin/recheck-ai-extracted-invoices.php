@@ -77,7 +77,7 @@ $rootDir   = Bootstrap::rootDir();
 $archiveRoot = (string) $container->get(\MyInvoice\Infrastructure\Config\Config::class)
     ->get('purchase_invoice.archive_storage', '');
 if ($archiveRoot === '') {
-    $archiveRoot = $rootDir . '/storage/purchase-invoices';
+    $archiveRoot = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('purchase-invoices');
 }
 
 // ── Najít kandidáty ───────────────────────────────────────────────────

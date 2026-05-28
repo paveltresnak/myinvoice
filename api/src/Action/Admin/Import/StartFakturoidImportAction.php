@@ -90,7 +90,7 @@ final class StartFakturoidImportAction
         \MyInvoice\Service\BackgroundProcess::spawnPhp(
             $rootDir . '/api/bin/import-worker.php',
             ['--job-id=' . $jobId],
-            $rootDir . '/log/import-worker.log',
+            \MyInvoice\Infrastructure\Config\RuntimePaths::log('import-worker.log'),
             $rootDir,
         );
     }

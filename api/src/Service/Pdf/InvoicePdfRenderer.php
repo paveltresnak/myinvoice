@@ -85,7 +85,7 @@ final class InvoicePdfRenderer
         }
 
         $rootDir = Bootstrap::rootDir();
-        $tmpDir = $rootDir . '/storage/cache/mpdf';
+        $tmpDir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('cache/mpdf');
         if (!is_dir($tmpDir)) {
             @mkdir($tmpDir, 0755, true);
         }
@@ -616,7 +616,7 @@ final class InvoicePdfRenderer
         $issueDate = new \DateTimeImmutable($invoice['issue_date']);
         // Multi-supplier: supplier subfolder zabraňuje kolizi varsymbolu mezi suppliery
         $supplierId = (int) ($invoice['supplier_id'] ?? 1);
-        $dir = $rootDir . '/storage/invoices/sup-' . $supplierId . '/' . $issueDate->format('Y-m');
+        $dir = \MyInvoice\Infrastructure\Config\RuntimePaths::storage('invoices') . '/sup-' . $supplierId . '/' . $issueDate->format('Y-m');
 
         $vs = $invoice['varsymbol'] ?? ('draft-' . $invoice['id']);
         // Sanitize varsymbol pro filesystem — defense-in-depth proti path traversal

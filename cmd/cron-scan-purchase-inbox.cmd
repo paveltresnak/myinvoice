@@ -21,7 +21,7 @@ REM ============================================================================
 setlocal
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "LOG_DIR=%PROJECT_ROOT%\log\cron"
+if defined MYINVOICE_DATA_DIR (set "LOG_DIR=%MYINVOICE_DATA_DIR%\log\cron") else (set "LOG_DIR=%PROJECT_ROOT%\log\cron")
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set "TODAY=%%i"
 set "LOG_FILE=%LOG_DIR%\scan-purchase-inbox-%TODAY%.log"
