@@ -13,13 +13,19 @@
 
 <table class="head">
   <tr>
-    <td class="logo">
-      {% if logo_path and logo_path is not empty %}
-        <img src="{{ logo_path }}" alt="logo">
-      {% else %}
-        <div class="brand-name">{{ supplier.company_name }}</div>
-      {% endif %}
-    </td>
+    {% if logo_show_name and logo_path and logo_path is not empty %}
+      {# Logo + název firmy — dvě sousední buňky (stejně jako faktura, kvůli mPDF). #}
+      <td class="logo-img-cell"><img src="{{ logo_path }}" alt="logo"></td>
+      <td class="logo-name">{{ supplier.display_name|default(supplier.company_name) }}</td>
+    {% else %}
+      <td class="logo">
+        {% if logo_path and logo_path is not empty %}
+          <img src="{{ logo_path }}" alt="logo" style="max-width: 72mm; max-height: 20mm;">
+        {% else %}
+          <div class="brand-name">{{ supplier.company_name }}</div>
+        {% endif %}
+      </td>
+    {% endif %}
     <td class="meta">
       <div class="doc-type">{{ t('Výkaz víceprací — ke schválení', 'Work report — for approval') }}</div>
       {% if invoice.varsymbol %}
@@ -38,6 +44,8 @@
       {{ t('Pro', 'For') }}: <strong>{{ invoice.client_company_name }}</strong>
     {% endif %}
     {% if invoice.project_name %} · {{ t('Zakázka', 'Project') }}: {{ invoice.project_name }}{% endif %}
+    {% if invoice.project_number %} · {{ t('Vaše číslo', 'Your order no.') }}: {{ invoice.project_number }}{% endif %}
+    {% if invoice.contract_number %} · {{ t('Vaše smlouva', 'Your contract') }}: {{ invoice.contract_number }}{% endif %}
   </div>
 </div>
 

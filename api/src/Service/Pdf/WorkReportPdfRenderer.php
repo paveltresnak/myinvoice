@@ -43,10 +43,12 @@ final class WorkReportPdfRenderer
         }
 
         $supplier = $this->resolveSupplier($invoice);
-        $logoPath = $this->resolveLogoPath($supplier);
+        // Logo + branding sdílené s fakturou (3 varianty hlavičky + accent barvy).
+        $logoPath = PdfBranding::logoPath($supplier, (int) ($invoice['supplier_id'] ?? 0));
 
         $cssPath = Bootstrap::rootDir() . '/styles/invoice.css';
         $css = is_file($cssPath) ? (string) file_get_contents($cssPath) : '';
+        $css .= PdfBranding::accentCss($supplier);
 
         $locale = (string) ($invoice['language'] ?? 'cs');
         $twig = $this->twig();
@@ -64,6 +66,7 @@ final class WorkReportPdfRenderer
             'thousand_sep'   => $locale === 'en' ? ',' : ' ',
             'css'            => '',
             'logo_path'      => $logoPath,
+            'logo_show_name' => $logoPath !== null && !empty($supplier['pdf_logo_show_name']),
         ]);
 
         $rootDir = Bootstrap::rootDir();
@@ -145,15 +148,4 @@ final class WorkReportPdfRenderer
         return $live;
     }
 
-    private function resolveLogoPath(array $supplier): ?string
-    {
-        $logoPath = $supplier['logo_path'] ?? null;
-        if (!$logoPath) return null;
-        if (!is_file($logoPath)) {
-            $abs = Bootstrap::rootDir() . '/' . ltrim($logoPath, '/');
-            if (is_file($abs)) return $abs;
-            return null;
-        }
-        return $logoPath;
-    }
 }
