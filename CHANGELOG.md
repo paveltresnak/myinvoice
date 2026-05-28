@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.8] — 2026-05-28
+
+Per-client číselné řady faktur, sledování paušální daně, konzistentní `MYINVOICE_DATA_DIR` a opravy importu z Fakturoidu.
+
+### Added
+
+- **Vlastní číselná řada faktury per klient** (*Klienti → detail klienta → Vlastní číslování faktur*) — volitelný formát čísla (vydaná / proforma / dobropis) a období counteru pro jednotlivé klienty; prázdné pole dědí nastavení dodavatele. Vhodné po migraci z Fakturoidu / iDokladu, kde měl každý klient vlastní řadu. Editor faktury ukazuje náhled čísla podle zvoleného klienta. Hlídá kolize formátů mezi klienty. (migrace `0061`, PR #55 — @Hermanik)
+- **Sledování paušální daně (§ 7a)** — v *Nastavení* lze u neplátce DPH zvolit pásmo (1./2./3., limit příjmů 1 / 1,5 / 2 mil. Kč). Na stránce *Tržby* se pak zobrazí dlaždice s využitím ročního limitu příjmů zvoleného pásma (zaplacené příjmy v kalendářním roce), barevně dle blízkosti stropu. (migrace `0062`)
+- **Oprava stavů importovaných faktur z Fakturoidu** — CLI nástroj `api/bin/fix-fakturoid-imported-statuses.php` dorovná u importovaných faktur stav (odesláno / zaplaceno / stornováno) podle Fakturoidu; idempotentní, neptřepisuje ručně změněné. (PR #54 — @Hermanik)
+
+### Fixed
+
+- **Import z Fakturoidu stahoval jen prvních 40 dokladů** — Fakturoid API v3 neposílá `Link` hlavičku pro stránkování (oproti dokumentaci); import nově projde všechny stránky. (PR #52 — @Hermanik)
+- **`MYINVOICE_DATA_DIR` nebyl konzistentně respektován** (#53) — PDF (cache i archiv), přílohy faktur, loga dodavatelů, importovaná PDF, zálohy, reset i cronové logy se nově ukládají pod zvolený data-dir (centrální resolver `RuntimePaths`). Dříve část souborů končila v adresáři aplikace i při nastaveném `MYINVOICE_DATA_DIR` (problém pro Docker single-volume / read-only root). Relativní cesty v DB zůstávají kompatibilní.
+- **Nastavení: zapnutí „Plátce DPH" vynuluje pásmo paušální daně** — paušál je neslučitelný s plátcovstvím DPH (§ 7a), uložení kombinace dříve skončilo chybou.
+- **CRM: nadpis „Přehled" zasahoval do KPI karet** — opraveno odsazení.
+
 ## [4.3.7] — 2026-05-28
 
 Daňový audit (opravy DPH/KH/SHV výkazů a daně z příjmů), zpřehlednění CRM, samočinné odblokování aktualizace a řádkové „Celkem s DPH" u vydaných faktur.
