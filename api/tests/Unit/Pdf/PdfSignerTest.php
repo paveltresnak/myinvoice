@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MyInvoice\Tests\Unit\Pdf;
 
-use MyInvoice\Bootstrap;
 use MyInvoice\Infrastructure\Config\Config;
 use MyInvoice\Service\Auth\SecretEncryption;
 use MyInvoice\Service\Pdf\PdfSigner;
@@ -41,7 +40,10 @@ final class PdfSignerTest extends TestCase
 
     private function signer(): PdfSigner
     {
-        return new PdfSigner(new SecretEncryption(Config::load(Bootstrap::rootDir())));
+        // Prázdný Config stačí — testy používají plaintext heslo (bez enc:v1: prefixu),
+        // takže SecretEncryption::decrypt() vrací as-is a šifrovací klíč se nevyžaduje.
+        // Tím test nezávisí na cfg.php (v CI checkoutu neexistuje).
+        return new PdfSigner(new SecretEncryption(new Config([])));
     }
 
     private function cfg(?string $tsa = null): SigningConfig
