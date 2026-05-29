@@ -232,14 +232,26 @@ final class PdfSigner
         $in  = tempnam(sys_get_temp_dir(), 'sig-in-');
         $out = tempnam(sys_get_temp_dir(), 'sig-out-');
         file_put_contents($in, $data);
+
+        // Řetězec certifikátů (intermediate CA) z P12 → vloží se do podpisu, aby
+        // čtečka uměla postavit cestu k důvěryhodné kořenové i bez AATL/EUTL.
+        $chainFile = null;
+        if (!empty($certs['extracerts']) && is_array($certs['extracerts'])) {
+            $chainFile = tempnam(sys_get_temp_dir(), 'chain-');
+            file_put_contents($chainFile, implode("\n", $certs['extracerts']));
+        }
+
         // BEZ NOATTR → openssl přidá signed attributes (contentType, signingTime,
         // messageDigest) = validní adbe.pkcs7.detached podpis, který čtečky (Adobe,
         // PDF-XChange) ověří. S NOATTR čtečka hlásí „nepodporovaný typ".
-        $ok = openssl_pkcs7_sign(
-            $in, $out, $certs['cert'], $certs['pkey'], [],
-            PKCS7_BINARY | PKCS7_DETACHED
-        );
+        $flags = PKCS7_BINARY | PKCS7_DETACHED;
+        if ($chainFile !== null) {
+            $ok = openssl_pkcs7_sign($in, $out, $certs['cert'], $certs['pkey'], [], $flags, $chainFile);
+        } else {
+            $ok = openssl_pkcs7_sign($in, $out, $certs['cert'], $certs['pkey'], [], $flags);
+        }
         @unlink($in);
+        if ($chainFile !== null) { @unlink($chainFile); }
         if (!$ok) {
             @unlink($out);
             throw new \RuntimeException('openssl_pkcs7_sign selhal: ' . openssl_error_string());
