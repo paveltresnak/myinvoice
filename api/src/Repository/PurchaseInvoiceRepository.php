@@ -243,7 +243,9 @@ final class PurchaseInvoiceRepository
                        pi.status, pi.booked_at, pi.paid_at, pi.cancelled_at,
                        pi.extraction_warning, pi.vat_deduction, pi.vat_deduction_percent, pi.tax_deductible,
                        c.company_name AS vendor_company_name, c.ic AS vendor_ic,
-                       DATE_FORMAT(pi.issue_date, '%Y-%m') AS month_bucket
+                       DATE_FORMAT(pi.issue_date, '%Y-%m') AS month_bucket,
+                       EXISTS (SELECT 1 FROM purchase_invoices adv_f
+                               WHERE adv_f.advance_purchase_invoice_id = pi.id) AS is_settled_advance
                        {$selectTotal}
                   FROM purchase_invoices pi
                   JOIN clients c ON c.id = pi.vendor_id
@@ -277,6 +279,11 @@ final class PurchaseInvoiceRepository
         $grouped = [];
         foreach ($rows as $row) {
             unset($row['total_rows']); // metadata, nepatří do invoice payloadu
+            // Spárovaná záloha = advance, na kterou ukazuje finální (vyúčtovací) faktura.
+            // Zachytit z DB flagu PŘED castem a vyřadit z payloadu (interní metadata).
+            $isSettledAdvance = (string) ($row['document_kind'] ?? '') === 'advance'
+                && (int) ($row['is_settled_advance'] ?? 0) === 1;
+            unset($row['is_settled_advance']);
             $row = $this->castInvoice($row);
             $month = (string) $row['month_bucket'];
             if (!isset($grouped[$month])) {
@@ -290,8 +297,13 @@ final class PurchaseInvoiceRepository
             $grouped[$month]['invoices'][] = $row;
             $grouped[$month]['count']++;
 
-            // Nákupy: nezahrnujeme draft (koncepty), cancelled (storno)
-            if (!in_array($row['status'], ['draft', 'cancelled'], true)) {
+            // Měsíční součet = reálný náklad. Vyřadit: draft/cancelled a spárovanou/zaplacenou
+            // zálohu (advance) — náklad nese finální faktura, jinak 2× započteno (shoda s
+            // costs_by_month / CRM). Nespárovaná nezaplacená záloha se počítá (očekávaný náklad).
+            // Řádek se i tak zobrazí (analogicky proforma u vystavených faktur).
+            $excludedAdvance = $row['document_kind'] === 'advance'
+                && ($row['status'] === 'paid' || $isSettledAdvance);
+            if (!in_array($row['status'], ['draft', 'cancelled'], true) && !$excludedAdvance) {
                 $cur = $row['currency'];
                 if (!isset($grouped[$month]['totals_per_currency'][$cur])) {
                     $grouped[$month]['totals_per_currency'][$cur] = [

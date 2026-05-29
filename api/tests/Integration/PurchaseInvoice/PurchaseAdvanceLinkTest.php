@@ -240,6 +240,38 @@ final class PurchaseAdvanceLinkTest extends TestCase
         self::assertSame(2, (int) $czk[0]['count'], 'do počtu jdou jen 2 doklady (faktura + otevřená záloha)');
     }
 
+    /**
+     * Seznam přijatých faktur — měsíční mezisoučet v hlavičce (totals_per_currency)
+     * NESMÍ dvojitě počítat spárované/zaplacené zálohy. Řádky se i tak všechny zobrazí.
+     */
+    public function testListMonthHeaderTotalsExcludeSettledAndPaidAdvance(): void
+    {
+        $vendor = $this->vendor('Dodavatel I', 'CZ10000009');
+        $final  = $this->purchase($vendor, 'invoice', 'LH-FAK',     'received', 20000.0, $this->d(10));
+        $paired = $this->purchase($vendor, 'advance', 'LH-ZAL-P',   'received',  5000.0, $this->d(9));
+        $this->repo->linkAdvance($final, $paired, $this->supplierId);                       // → vyloučena
+        $this->purchase($vendor, 'advance', 'LH-ZAL-PAID', 'paid',     7000.0, $this->d(8)); // → vyloučena
+        $this->purchase($vendor, 'advance', 'LH-ZAL-OPEN', 'received', 3000.0, $this->d(7)); // → započítána
+
+        $res = $this->repo->listGroupedByMonth(
+            ['supplier_id' => $this->supplierId, 'vendor_id' => $vendor, 'year' => self::YEAR]
+        );
+        $group = null;
+        foreach ($res['data'] as $g) {
+            if ($g['month'] === sprintf('%04d-06', self::YEAR)) { $group = $g; break; }
+        }
+        self::assertNotNull($group, 'měsíční skupina 2099-06 existuje');
+        self::assertSame(4, $group['count'], 'všechny 4 doklady jsou v seznamu zobrazené');
+
+        $czk = null;
+        foreach ($group['totals_per_currency'] as $tc) {
+            if ($tc['currency'] === 'CZK') { $czk = $tc; break; }
+        }
+        self::assertNotNull($czk, 'CZK mezisoučet existuje');
+        self::assertEqualsWithDelta(23000.0, (float) $czk['with_vat'], 0.01,
+            'mezisoučet = faktura 20000 + otevřená záloha 3000; spárovaná (5000) a zaplacená (7000) vyloučeny');
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     /** Zavolá GetClientAction a vrátí dekódované tělo (Json::ok zapisuje data napřímo). */
