@@ -80,12 +80,14 @@ najdeš panel **Dokumenty**, kde vidíš všechny připojené soubory a přes tl
 
 ## Hromadné akce
 
-Zaškrtni více dokumentů (v mřížce i seznamu) a v liště nahoře:
+Zaškrtni více dokumentů **i složek současně** (v mřížce i seznamu) a v liště nahoře:
 
-- **Přesunout** do jiné složky,
-- **Otagovat** (přidat štítky),
-- **Stáhnout ZIP** vybraných souborů,
-- **Smazat** (do koše).
+- **Přesunout** do jiné složky (přes stromový výběr cíle),
+- **Otagovat** (přidat štítky — jen u souborů),
+- **Stáhnout ZIP** vybraných souborů i složek (export zachová stromovou strukturu složek),
+- **Smazat** (do koše — u složky včetně obsahu).
+
+Velikost každé složky je vidět přímo v dlaždici. Na mobilu (bez najetí myší) se akce složky (přejmenovat/smazat) odkryjí prvním ťuknutím a spustí až druhým — ochrana proti nechtěnému smazání.
 
 ## Koš
 

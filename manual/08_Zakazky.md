@@ -32,7 +32,7 @@ Tabulka:
 | Stav | `Aktivní` / `Pozastavené` / `Uzavřené` |
 | Hodinová sazba | Default sazba pro položky typu „hodina" |
 | Měna | Výchozí pro nové faktury |
-| Splatnost | Default počet dní splatnosti |
+| Splatnost | Preset **7 dnů / 14 dnů / Měsíc / Vlastní**; „Měsíc" = kalendářní měsíc. Zakázka přebíjí klienta i dodavatele |
 | Obrat letos | Suma vystavených faktur na zakázce |
 
 Nahoře je filtr **Klient** (dropdown se všemi klienty) — zúží seznam jen na
@@ -51,7 +51,7 @@ Z **detailu klienta → záložka Zakázky → + Nová zakázka**.
 | Číslo smlouvy | Volitelné — bude na faktuře v rámečku „Smlouva č." |
 | Hodinová sazba | Defaultní sazba pro položky typu „hodina" v editoru faktury |
 | Měna | CZK / EUR / … |
-| Splatnost (dny) | Override defaultu (7 dní) |
+| Splatnost | Preset 7/14 dnů, **Měsíc** (kalendářní) nebo **Vlastní** počet dní |
 | Rozpočet — celkem | Volitelný horní limit za celou zakázku (varování v editoru, pokud překročíš) |
 | Rozpočet — ročně | Volitelný roční limit |
 | Rozpočet — měsíčně | Volitelný měsíční limit |

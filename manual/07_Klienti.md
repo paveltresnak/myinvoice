@@ -64,7 +64,7 @@ Doporučený postup pro českého klienta:
 | Výchozí měna | Pro nové faktury (lze přepsat per faktura) |
 | Výchozí DPH | Volitelný override (jinak se použije systémový default) |
 | Reverse charge | Zatrhni pro EU B2B klienty s DIČ — DPH 0 % + text „Daň přiznává odběratel" |
-| Splatnost (dny) | Volitelný override (jinak default 7 dní) |
+| Splatnost | Preset **7 dnů / 14 dnů / Měsíc / Vlastní**, nebo **Použít výchozí** = dědit z dodavatele. „Měsíc" = kalendářní měsíc (1. 2. → 1. 3., 31. 1. → 28. 2.), ne fixních 30 dní |
 | Poznámka | Interní text — nezobrazí se na faktuře |
 
 ## 7.3 Detail klienta
