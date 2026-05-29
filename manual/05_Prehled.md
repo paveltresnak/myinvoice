@@ -72,3 +72,17 @@ php api/bin/recompute-stats.php
 
 > 🛈 Sample data (vygenerovaná během setup wizardu) automaticky přepočítají
 > stats hned po dokončení — nemusíš nic dělat.
+
+## 5.8 Vzhled — světlý a tmavý režim
+
+V horní liště (vpravo, vedle přepínače jazyka) je přepínač barevného motivu se
+třemi stavy:
+
+- **Systém** — řídí se nastavením operačního systému / prohlížeče
+  (`prefers-color-scheme`). Výchozí volba.
+- **Světlý** — vždy světlé téma.
+- **Tmavý** — vždy tmavé téma.
+
+Volba se ukládá do prohlížeče (per zařízení) a platí napříč celou aplikací
+včetně grafů. Na mobilu je přepínač v rozbalovacím menu (☰) dole, vedle
+přepínače jazyka.

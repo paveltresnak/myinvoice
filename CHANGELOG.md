@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.0] — 2026-05-29
+
+Tmavý režim (dark mode) s přepínačem **Systém / Světlý / Tmavý** a úpravy dashboardu.
+
+### Added
+
+- **Tmavý režim (dark mode)** — přepínač **Systém / Světlý / Tmavý** v horní liště, na mobilu v rozbalovacím menu vedle přepínače jazyka. Výchozí *Systém* sleduje nastavení operačního systému (`prefers-color-scheme`), ruční volba se ukládá do prohlížeče (per zařízení). Řešeno token-driven — třída `.dark` přepisuje hodnoty CSS proměnných, takže se přepne celá aplikace včetně grafů; při načtení nebliká. Světlý režim zůstává beze změny. (#65)
+
 ### Changed
 
 - **Dashboard** — homepage zobrazuje jen **aktivní měny** (neaktivní měny se v přehledu tržeb už neukazují). Při jediné aktivní měně je graf tržeb vyšší (vlevo) a KPI boxy jsou v matici 2×2 vpravo; při více měnách beze změny. V sekci nákladů je box „CRM" nahrazen **mini grafem nákladů** za posledních 12 měsíců.
