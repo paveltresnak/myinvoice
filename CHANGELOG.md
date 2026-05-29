@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.2] — 2026-05-29
+
+Opravy u přijatých faktur uhrazených zálohou a přenačtení detailu faktury při prokliku.
+
+### Fixed
+
+- **„K úhradě" u přijaté faktury uhrazené zálohou** ukazovalo celou částku místo 0 (nula v JS propadala přes `||` na celkovou částku). Hodnota v datech (`amount_to_pay`, generated column) byla správná, chyba byla jen v zobrazení detailu.
+- **Proklik mezi doklady nepřenačítal detail** (přijatá i vydaná faktura) — navigace `/…/:id → :id` recyklovala komponentu a `onMounted` se znovu nespustil; doplněn `watch` na změnu id.
+
+### Changed
+
+- **Seznam přijatých faktur** — sloupec „K úhradě" přejmenován na **„Celkem s DPH"** a řádky nově ukazují celkovou částku dokladu (dřív 0 u faktur uhrazených zálohou); řádky teď odpovídají měsíčnímu součtu.
+- **Editor přijaté faktury** — přidáno editovatelné pole **„Uhrazená záloha"** s dopočtem „K úhradě".
+
 ## [4.5.1] — 2026-05-29
 
 Přílohy přímo v editoru faktury, robustní predikce ročního obratu, vyšší kontrast tmavého režimu a vylepšení statistik.
