@@ -69,7 +69,7 @@ final class PdfSignerTest extends TestCase
 
         self::assertStringContainsString('/Type /Sig', $signed, 'chybí signature dictionary');
         self::assertStringContainsString('/ByteRange [0 ', $signed, 'chybí ByteRange');
-        self::assertStringContainsString('/SubFilter /ETSI.CAdES.detached', $signed);
+        self::assertStringContainsString('/SubFilter /adbe.pkcs7.detached', $signed);
         self::assertStringContainsString('/AcroForm', $signed, 'chybí AcroForm');
         // původní obsah PDF zůstal beze změny (incremental update)
         self::assertStringStartsWith($orig, $signed, 'incremental update změnil originál');

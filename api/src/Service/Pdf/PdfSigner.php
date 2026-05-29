@@ -140,7 +140,7 @@ final class PdfSigner
         // (a) signature dictionary
         $reason = $this->pdfString($cfg->reason);
         $append($sigNum,
-            "<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /ETSI.CAdES.detached "
+            "<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached "
             . "/ByteRange $brPlaceholder /Contents $contentsPlaceholder "
             . "/M ($date) /Reason $reason >>");
 
@@ -232,9 +232,12 @@ final class PdfSigner
         $in  = tempnam(sys_get_temp_dir(), 'sig-in-');
         $out = tempnam(sys_get_temp_dir(), 'sig-out-');
         file_put_contents($in, $data);
+        // BEZ NOATTR → openssl přidá signed attributes (contentType, signingTime,
+        // messageDigest) = validní adbe.pkcs7.detached podpis, který čtečky (Adobe,
+        // PDF-XChange) ověří. S NOATTR čtečka hlásí „nepodporovaný typ".
         $ok = openssl_pkcs7_sign(
             $in, $out, $certs['cert'], $certs['pkey'], [],
-            PKCS7_BINARY | PKCS7_DETACHED | PKCS7_NOATTR
+            PKCS7_BINARY | PKCS7_DETACHED
         );
         @unlink($in);
         if (!$ok) {
