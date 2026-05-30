@@ -36,6 +36,7 @@ final class SettingsAction
         private readonly IpMatcher $ipMatcher,
         private readonly InvoicePdfRenderer $pdf,
         private readonly Config $config,
+        private readonly \MyInvoice\Service\Auth\SecretEncryption $secrets,
     ) {}
 
     /** Aktuální supplier (z X-Supplier-Id middleware). */
@@ -207,6 +208,10 @@ final class SettingsAction
             // Doplňky pro DPH/KH XML VetaP (migrace 0043)
             'street_number_pop', 'street_number_orient',
             'opr_jmeno', 'opr_prijmeni', 'opr_postaveni',
+            // Podpis PDF certifikátem (migrace 0076) — toggle/TSA/důvod. Cert+heslo se
+            // NIKDY nemění mass-assignmentem (jen přes SigningCertAction multipart upload).
+            // signing_tsa_password (heslo k TSA) taky NE mass-assign — řešeno níže (encrypt).
+            'pdf_signing_enabled', 'signing_tsa_url', 'signing_reason', 'signing_tsa_username',
         ];
 
         // Validace tax fields
@@ -306,6 +311,13 @@ final class SettingsAction
                     : $body[$f];
             }
         }
+        // TSA heslo (HTTP Basic auth) — NIKDY mass-assign: šifruj, prázdné = vymaž.
+        if (array_key_exists('signing_tsa_password', $body)) {
+            $tsaPw = (string) $body['signing_tsa_password'];
+            $sets[] = 'signing_tsa_password_enc = ?';
+            $params[] = $tsaPw !== '' ? $this->secrets->encrypt($tsaPw) : null;
+        }
+
         if (empty($sets)) return $this->respondSupplier($response, $id);
 
         $params[] = $id;
@@ -317,6 +329,12 @@ final class SettingsAction
         if (array_key_exists('email_accent_color', $body)
             || array_key_exists('email_branding_enabled', $body)
             || array_key_exists('pdf_logo_show_name', $body)
+            // Podpis PDF se renderuje živě → po změně toggle/TSA invaliduj cached PDF
+            || array_key_exists('pdf_signing_enabled', $body)
+            || array_key_exists('signing_tsa_url', $body)
+            || array_key_exists('signing_tsa_username', $body)
+            || array_key_exists('signing_tsa_password', $body)
+            || array_key_exists('signing_reason', $body)
         ) {
             $this->pdf->invalidateDraftsBySupplier($id);
         }
@@ -415,6 +433,15 @@ final class SettingsAction
         $row['email_accent_color']       = (string) ($row['email_accent_color'] ?? '#3B2D83');
         $row['pdf_logo_show_name']       = (bool) ($row['pdf_logo_show_name'] ?? false);
         $row['has_email_logo']           = is_file(\MyInvoice\Infrastructure\Config\RuntimePaths::storage('supplier-logos') . '/sup-' . $row['id'] . '.png');
+        // Podpis PDF (migrace 0076): heslo k certifikátu NIKDY neposílat do API.
+        $row['pdf_signing_enabled']      = (bool) ($row['pdf_signing_enabled'] ?? false);
+        $row['signing_tsa_url']          = $row['signing_tsa_url'] ?? null;
+        $row['signing_reason']           = (string) ($row['signing_reason'] ?? '');
+        $signingRel                      = (string) ($row['signing_cert_path'] ?? '');
+        $row['has_signing_cert']         = $signingRel !== '' && is_file(\MyInvoice\Service\Pdf\SigningConfig::absCertPath($signingRel));
+        $row['signing_tsa_username']     = $row['signing_tsa_username'] ?? null;
+        $row['has_tsa_password']         = !empty($row['signing_tsa_password_enc']);
+        unset($row['signing_cert_password_enc'], $row['signing_cert_path'], $row['signing_tsa_password_enc']);
         // Globální cfg fallback pro varsymbol — UI ho použije jako placeholder
         // u prázdných per-supplier polí (aby uživatel viděl, jaká šablona by se
         // použila kdyby ponechal pole prázdné).
