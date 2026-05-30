@@ -26,13 +26,15 @@ final class MeAction
         $currentSupplierId = (int) $request->getAttribute(SupplierScopeMiddleware::ATTR_CURRENT_ID, 0);
 
         $suppliers = $this->db->pdo()->query(
-            'SELECT id, company_name, ic, is_vat_payer,
+            'SELECT id, company_name, ic, is_vat_payer, taxpayer_type,
                     default_payment_due_days, default_payment_due_unit
                FROM supplier ORDER BY id'
         )->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($suppliers as &$s) {
             $s['id']                       = (int) $s['id'];
             $s['is_vat_payer']             = (bool) $s['is_vat_payer'];
+            // 'fo' = OSVČ (fyzická osoba), 'po' = s.r.o. (právnická osoba), null = nenastaveno.
+            $s['taxpayer_type']            = $s['taxpayer_type'] !== null ? (string) $s['taxpayer_type'] : null;
             $s['default_payment_due_days'] = (int) $s['default_payment_due_days'];
             $s['default_payment_due_unit'] = (string) ($s['default_payment_due_unit'] ?? 'days');
         }

@@ -15,6 +15,8 @@ export interface SupplierBrief {
   company_name: string
   ic: string | null
   is_vat_payer: boolean
+  /** 'fo' = OSVČ (fyzická osoba), 'po' = s.r.o. (právnická osoba), null = nenastaveno. */
+  taxpayer_type: 'fo' | 'po' | null
   default_payment_due_days: number
   default_payment_due_unit: 'days' | 'month'
 }
